@@ -35,3 +35,16 @@ def test_heuristic_explanations_are_bounded():
         result = score_merchant(merchant)
         assert 0 <= result['risk_score'] <= 100
         assert result['risk_level'] in {'low', 'medium', 'high'}
+
+def test_transactions_are_explicitly_synthetic():
+    rows = client.get('/api/transactions?merchant_id=m-1003').json()
+    assert rows
+    assert all(row['synthetic'] is True for row in rows)
+    assert all(row['merchant_id'] == 'm-1003' for row in rows)
+
+def test_relationship_graph_has_grounded_edges():
+    graph = client.get('/api/relationships').json()
+    node_ids = {node['id'] for node in graph['nodes']}
+    assert graph['edges']
+    assert all(edge['source'] in node_ids and edge['target'] in node_ids for edge in graph['edges'])
+    assert 'Synthetic' in graph['notice']
