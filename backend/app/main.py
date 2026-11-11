@@ -75,7 +75,7 @@ def dashboard(db:Session=Depends(get_db)):
     total_tx=db.scalar(select(func.count()).select_from(Transaction)) or 0
     synthetic_tx=db.scalar(select(func.count()).select_from(Transaction).where(Transaction.synthetic.is_(True))) or 0
     real_tx=total_tx-synthetic_tx
-    data_mode="SYNTHETIC DEMO DATA" if real_tx==0 else "MIXED INGESTED DATA" if synthetic_tx else "INGESTED TRANSACTION DATA"
+    data_mode="NO TRANSACTION DATA" if total_tx==0 else "SYNTHETIC DEMO DATA" if real_tx==0 else "MIXED INGESTED DATA" if synthetic_tx else "INGESTED TRANSACTION DATA"
     high=sum(x["risk_level"]=="high" for x in items);med=sum(x["risk_level"]=="medium" for x in items)
     open_cases=db.scalar(select(func.count()).select_from(Investigation).where(Investigation.status.in_(["open","investigating","escalated"]))) or 0
     verification=db.scalar(select(func.count()).select_from(Intervention).where(Intervention.action=="verification_request")) or 0
