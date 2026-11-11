@@ -1,3 +1,6 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
@@ -7,6 +10,8 @@ from app import models
 config=context.config
 if config.config_file_name is not None:fileConfig(config.config_file_name)
 target_metadata=Base.metadata
+if os.getenv("DATABASE_URL"):
+    config.set_main_option("sqlalchemy.url",os.getenv("DATABASE_URL").replace("%","%%"))
 
 def run_migrations_offline():
     url=config.get_main_option("sqlalchemy.url")
