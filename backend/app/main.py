@@ -72,7 +72,10 @@ def dashboard(db:Session=Depends(get_db)):
     for m in merchants:
         r=evaluate_merchant(db,m,persist=False);f=r["features"]
         items.append({"id":m.id,"name":m.name,"category":m.category,"status":m.status,"risk_score":r["risk_score"],"risk_level":r["severity"],"confidence":r["confidence"],"signals":r["signals"],"explanation":r["explanation"],"features":f})
-    total_tx=db.scalar(select(func.count()).select_from(Transaction)) or 0\n    synthetic_tx=db.scalar(select(func.count()).select_from(Transaction).where(Transaction.synthetic.is_(True))) or 0\n    real_tx=total_tx-synthetic_tx\n    data_mode="SYNTHETIC DEMO DATA" if real_tx==0 else "MIXED INGESTED DATA" if synthetic_tx else "INGESTED TRANSACTION DATA"
+    total_tx=db.scalar(select(func.count()).select_from(Transaction)) or 0
+    synthetic_tx=db.scalar(select(func.count()).select_from(Transaction).where(Transaction.synthetic.is_(True))) or 0
+    real_tx=total_tx-synthetic_tx
+    data_mode="SYNTHETIC DEMO DATA" if real_tx==0 else "MIXED INGESTED DATA" if synthetic_tx else "INGESTED TRANSACTION DATA"
     high=sum(x["risk_level"]=="high" for x in items);med=sum(x["risk_level"]=="medium" for x in items)
     open_cases=db.scalar(select(func.count()).select_from(Investigation).where(Investigation.status.in_(["open","investigating","escalated"]))) or 0
     verification=db.scalar(select(func.count()).select_from(Intervention).where(Intervention.action=="verification_request")) or 0
