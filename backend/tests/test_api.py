@@ -33,6 +33,11 @@ def test_investigation_verification_and_audit(client):
     assert client.post("/api/merchants/m-0001/assess").status_code==200
     case=client.post("/api/investigations?merchant_id=m-0001");assert case.status_code==200
     cid=case.json()["id"]
+    previous_assessment=case.json()["assessment_id"]
+    simulated=client.post("/api/scenarios/run",json={"merchant_id":"m-0001","scenario":"festival"})
+    assert simulated.status_code==200
+    refreshed_case=next(x for x in client.get("/api/investigations").json() if x["id"]==cid)
+    assert refreshed_case["assessment_id"]!=previous_assessment
     update=client.patch(f"/api/investigations/{cid}",json={"status":"investigating","note":"Review the declared change","assigned_to":"analyst-1"})
     assert update.status_code==200 and update.json()["status"]=="investigating"
     v=client.post(f"/api/investigations/{cid}/verification",json={"reason":"Confirm the declared operating change","requested_document":"Business registration"})
@@ -48,6 +53,8 @@ def test_investigation_verification_and_audit(client):
     assert any(x["resource_id"]==cid for x in client.get("/api/audit").json())
 
 def test_graph_and_evaluation(client):
+    created=client.post("/api/merchants/m-0001/events",json={"event_type":"new_delivery_channel","description":"Merchant declared a new same-day delivery service for nearby customers."})
+    assert created.status_code==200 and created.json()["verification_status"]=="unverified"
     context=client.get("/api/merchants/m-0021").json()["events"][0]
     review=client.patch(f"/api/merchant-events/{context['id']}/verification",json={"verification_status":"partially_verified","review_reason":"One supporting invoice was checked by the investigator"},headers={"X-Role":"investigator"})
     assert review.status_code==200 and review.json()["verification_status"]=="partially_verified"
