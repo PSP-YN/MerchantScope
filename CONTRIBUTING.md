@@ -1,14 +1,9 @@
-# Contributing
+# Contributing to TRACE
 
-1. Open an issue describing the problem or proposed change.
-2. Keep changes scoped and explain assumptions, especially for risk signals.
-3. Never add real merchant, customer, card, or payment data. Use clearly labelled synthetic fixtures.
-4. Add or update tests for API behaviour and scoring logic.
-5. Run backend tests and the frontend production build before opening a pull request.
-
-```bash
-cd backend && .venv/bin/pytest -q
-cd ../frontend && npm run build
-```
-
-Risk scores must remain explainable. Do not present heuristic scores as probabilities or implement automatic adverse actions without an explicit, reviewed product and governance decision.
+1. Create a feature branch from main.
+2. Keep synthetic fixtures clearly labelled; never add real customer or payment data.
+3. Add or update pytest coverage for API, model, and persistence changes.
+4. Run backend pytest and frontend build checks.
+5. Document changes to score weights, feature definitions, or schema.
+6. Do not add automated adverse actions or claim fraud certainty.
+7. Submit a pull request with scope, test evidence, and known limitations.
