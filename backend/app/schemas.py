@@ -43,7 +43,7 @@ from datetime import datetime, timezone
 
 class MerchantCreate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
-    category: str = Field(pattern="^(bakery|restaurant|grocery|electronics|clothing|other)$")
+    category: str = Field(pattern="^(bakery|restaurant|grocery|electronics|clothing)$")
     declared_description: str = Field(default="", max_length=2000)
 
 class TransactionIngest(BaseModel):
