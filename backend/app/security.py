@@ -17,7 +17,7 @@ def actor_context(authorization: str | None = Header(default=None), x_actor: str
     role = tokens.get(token)
     if not token or not role or role == "":
         raise HTTPException(401, "Valid TRACE bearer token required")
-    return {"actor": x_actor[:120], "role": role}
+    return {"actor": f"trace-{role}", "role": role}
 
 def require_role(actor: dict, allowed: set[str]):
     if actor["role"] not in allowed:
