@@ -3,7 +3,7 @@ import random,uuid,math
 from datetime import datetime,timedelta,timezone
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
-from .models import Merchant,MerchantProfile,Transaction,MerchantEvent,EntityNode,EntityEdge,RiskSignal,RiskAssessment,Investigation,Intervention,AuditLog,BehaviouralFeature
+from .models import Merchant,MerchantProfile,Transaction,MerchantEvent,EntityNode,EntityEdge,RiskSignal,RiskAssessment,Investigation,InvestigationNote,Intervention,AuditLog,BehaviouralFeature
 
 CATEGORIES=["bakery","restaurant","grocery","electronics","clothing"]
 SCENARIOS={"normal":{"label":"Normal operations","description":"Stable merchant-specific operating pattern."},"festival":{"label":"Festival sales increase","description":"Seasonal demand increase with stable refund and ticket patterns."},"expansion":{"label":"Legitimate online expansion","description":"New digital channel and higher reach after a declared business change."},"unexplained_spike":{"label":"Unexplained transaction increase","description":"Abrupt volume and ticket-size change without declared context."},"shared_device":{"label":"Suspicious shared-device network","description":"Several unrelated merchants share a pseudonymous device fingerprint."},"refund_anomaly":{"label":"Abnormal refund behaviour","description":"Refund share rises materially above the merchant baseline."},"mixed_signals":{"label":"Mixed legitimate and suspicious signals","description":"Declared promotion overlaps with refund and relationship anomalies."}}
@@ -35,7 +35,7 @@ def seed_demo(db:Session,force:bool=False):
     existing=db.query(Merchant).count()
     if existing and not force:return {"seeded":False,"merchants":existing,"transactions":db.query(Transaction).count()}
     if force:
-        for model in [RiskSignal,RiskAssessment,Intervention,Investigation,AuditLog,EntityEdge,EntityNode,MerchantEvent,Transaction,BehaviouralFeature,MerchantProfile,Merchant]:db.execute(delete(model))
+        for model in [Intervention,InvestigationNote,Investigation,RiskSignal,RiskAssessment,AuditLog,EntityEdge,EntityNode,MerchantEvent,Transaction,BehaviouralFeature,MerchantProfile,Merchant]:db.execute(delete(model))
         db.commit()
     rng=random.Random(42);now=datetime.now(timezone.utc);names=["Oven House","Copper Kettle","Green Basket","Circuit House","Thread & Loom","Market Street","Daily Crumb","Harvest Table","Fresh Cart","Pixel Point"]
     cycle=["normal"]*20+["festival"]*10+["expansion"]*10+["unexplained_spike"]*10+["shared_device"]*10+["refund_anomaly"]*10+["mixed_signals"]*10+["normal"]*20
@@ -63,8 +63,8 @@ def run_scenario(db:Session,merchant_id:str,scenario:str):
     if not merchant:raise LookupError("Merchant not found")
     now=datetime.now(timezone.utc);idx=int(merchant_id.split("-")[-1]);db.execute(delete(Transaction).where(Transaction.merchant_id==merchant_id))
     rows=_make_tx(merchant.id,idx,merchant.category,scenario,random.Random(1000+idx+sum(map(ord,scenario))),now);db.add_all(rows)
-    db.execute(delete(MerchantEvent).where(MerchantEvent.merchant_id==merchant_id));merchant.scenario_label=scenario
+    db.execute(delete(MerchantEvent).where(MerchantEvent.merchant_id==merchant_id));db.execute(delete(EntityEdge).where(EntityEdge.source_id==merchant_id));merchant.scenario_label=scenario
     if scenario in {"festival","expansion","mixed_signals"}:
         db.add(MerchantEvent(id=_id("evt"),merchant_id=merchant.id,event_type="festival_promotion" if scenario!="expansion" else "online_expansion",description=SCENARIOS[scenario]["description"],verification_status="unverified",effective_at=now-timedelta(days=10)))
-    db.flush();db.info.pop("trace_portfolio_features",None);db.commit()
+    db.flush()\n    if scenario in {"shared_device","mixed_signals"} and db.get(EntityNode,"device:shared-cluster-01"):\n        db.add(EntityEdge(source_id=merchant_id,target_id="device:shared-cluster-01",relation="shared_device",evidence_count=sum(1 for t in rows if t.device_token=="device:shared-cluster-01")))\n    db.info.pop("trace_portfolio_features",None);db.info.pop("trace_category_features",None);db.commit()
     return {"merchant_id":merchant_id,"scenario":scenario,"scenario_label":SCENARIOS[scenario]["label"],"transactions_replaced":len(rows),"data_mode":"SYNTHETIC"}
