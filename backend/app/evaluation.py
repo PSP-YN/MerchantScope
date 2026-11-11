@@ -37,7 +37,7 @@ def evaluate_models(db:Session):
         scenario=getattr(m,"scenario_label","normal");label=int(scenario in POSITIVE)
         r=evaluate_merchant(db,m,persist=False);f=r["features"];baseline=m.profile.baseline_daily_count if m.profile else 0
         static.append(int(f["sufficient_history"] and (f["daily_count"]>max(12,baseline*2.8) or f["refund_rate"]>.15 or f["night_share"]>.30)))
-        trace.append(int(r["risk_score"]>=30));truth.append(label)
+        trace.append(int(r["risk_score"]>=20));truth.append(label)
         if label:
             eligible+=1;delay=_scenario_delay(db,m,shared_devices)
             if delay is not None:delay_values.append(delay)
