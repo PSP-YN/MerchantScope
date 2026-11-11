@@ -18,7 +18,7 @@ origins=[x.strip() for x in os.getenv("CORS_ORIGINS","http://localhost:5173,http
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=False,allow_methods=["GET","POST","PATCH","OPTIONS"],allow_headers=["Authorization","Content-Type","X-Actor","X-Role"])
 @app.middleware("http")
 async def production_auth_gate(request:Request,call_next):
-    if os.getenv("APP_ENV","demo").lower()=="production" and request.url.path not in {"/health","/docs","/openapi.json","/redoc"}:
+    if os.getenv("APP_ENV","demo").lower()=="production" and request.method!="OPTIONS" and request.url.path not in {"/health","/docs","/openapi.json","/redoc"}:
         token=request.headers.get("Authorization","").removeprefix("Bearer ").strip()
         valid={os.getenv("TRACE_ANALYST_TOKEN",""),os.getenv("TRACE_INVESTIGATOR_TOKEN",""),os.getenv("TRACE_ADMIN_TOKEN",""),os.getenv("TRACE_REVIEWER_TOKEN","")}
         valid.discard("")
