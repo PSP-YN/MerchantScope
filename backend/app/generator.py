@@ -66,5 +66,7 @@ def run_scenario(db:Session,merchant_id:str,scenario:str):
     db.execute(delete(MerchantEvent).where(MerchantEvent.merchant_id==merchant_id));db.execute(delete(EntityEdge).where(EntityEdge.source_id==merchant_id));merchant.scenario_label=scenario
     if scenario in {"festival","expansion","mixed_signals"}:
         db.add(MerchantEvent(id=_id("evt"),merchant_id=merchant.id,event_type="festival_promotion" if scenario!="expansion" else "online_expansion",description=SCENARIOS[scenario]["description"],verification_status="unverified",effective_at=now-timedelta(days=10)))
-    db.flush()\n    if scenario in {"shared_device","mixed_signals"} and db.get(EntityNode,"device:shared-cluster-01"):\n        db.add(EntityEdge(source_id=merchant_id,target_id="device:shared-cluster-01",relation="shared_device",evidence_count=sum(1 for t in rows if t.device_token=="device:shared-cluster-01")))\n    db.info.pop("trace_portfolio_features",None);db.info.pop("trace_category_features",None);db.commit()
+    db.flush()
+    if scenario in {"shared_device","mixed_signals"} and db.get(EntityNode,"device:shared-cluster-01"):
+        db.add(EntityEdge(source_id=merchant_id,target_id="device:shared-cluster-01",relation="shared_device",evidence_count=sum(1 for t in rows if t.device_token=="device:shared-cluster-01")))\n    db.info.pop("trace_portfolio_features",None);db.info.pop("trace_category_features",None);db.commit()
     return {"merchant_id":merchant_id,"scenario":scenario,"scenario_label":SCENARIOS[scenario]["label"],"transactions_replaced":len(rows),"data_mode":"SYNTHETIC"}
