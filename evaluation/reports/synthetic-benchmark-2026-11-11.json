@@ -1,0 +1,65 @@
+{
+  "data_mode": "SYNTHETIC LABELLED SCENARIO BENCHMARK",
+  "split": {
+    "method": "First 60 days baseline, latest 30 days evaluation",
+    "leakage_controls": "Scenario labels are evaluation targets only and are not included in feature vectors."
+  },
+  "static_threshold": {
+    "precision": 1,
+    "recall": 0.55,
+    "f1": 0.7097,
+    "false_positive_rate": 0,
+    "legitimate_merchant_false_positive_rate": 0,
+    "true_positives": 22,
+    "false_positives": 0,
+    "false_negatives": 18,
+    "true_negatives": 60
+  },
+  "trace_contextual": {
+    "precision": 1,
+    "recall": 1,
+    "f1": 1,
+    "false_positive_rate": 0,
+    "legitimate_merchant_false_positive_rate": 0,
+    "true_positives": 40,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "true_negatives": 60
+  },
+  "category_performance": {
+    "bakery": {
+      "merchant_count": 20,
+      "trace_f1": 1
+    },
+    "clothing": {
+      "merchant_count": 20,
+      "trace_f1": 1
+    },
+    "electronics": {
+      "merchant_count": 20,
+      "trace_f1": 1
+    },
+    "grocery": {
+      "merchant_count": 20,
+      "trace_f1": 1
+    },
+    "restaurant": {
+      "merchant_count": 20,
+      "trace_f1": 1
+    }
+  },
+  "detection_delay_days": {
+    "mean_days": 1.65,
+    "median_days": 1,
+    "detected_scenarios": 40,
+    "eligible_scenarios": 40,
+    "detection_rate": 1,
+    "method": "Days from synthetic scenario onset to first 3-day rolling statistical or shared-entity graph trigger."
+  },
+  "limitations": [
+    "Synthetic scenario labels are not representative of real payment fraud prevalence.",
+    "Isolation Forest is unsupervised and not a calibrated probability.",
+    "Detection delay is measured on generated scenario onset, not real payment-provider incident timestamps.",
+    "Results are an engineering benchmark, not production performance."
+  ]
+}
