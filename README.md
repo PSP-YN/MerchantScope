@@ -44,7 +44,7 @@ cp .env.example .env
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-On first start, TRACE creates the relational schema and seeds 100 synthetic merchants with approximately 40,000 transactions across 90 days. The process is deterministic in scenario assignment and random seed; transaction IDs and timestamps are generated at seed time.
+On first demo start, TRACE creates the relational schema and seeds 100 synthetic merchants with approximately 40,000 transactions across 90 days. The process is deterministic in scenario assignment and random seed; transaction IDs and timestamps are generated at seed time. PostgreSQL production mode requires a PostgreSQL `DATABASE_URL` and four distinct role tokens of at least 32 characters. Production startup applies the checked-in Alembic migration head; demo mode uses SQLite and does not require secrets.
 
 API documentation: http://127.0.0.1:8000/docs. The API includes merchant creation, transaction batch ingestion, structured context declaration/review, merchant assessment, scenario execution, investigation and intervention workflows, audit retrieval, and model evaluation.
 
