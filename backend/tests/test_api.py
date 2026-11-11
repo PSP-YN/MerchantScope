@@ -40,10 +40,10 @@ def test_investigation_verification_and_audit(client):
     refreshed=client.get("/api/investigations").json()
     saved=next(x for x in refreshed if x["id"]==cid)
     assert any("declared operating change" in n["note"] for n in saved["notes"])
-    proposal=client.post(f"/api/investigations/{cid}/interventions",json={"action":"enhanced_monitoring","reason":"Maintain monitoring during manual verification"})
+    proposal=client.post(f"/api/investigations/{cid}/interventions",json={"action":"enhanced_monitoring","reason":"Maintain monitoring during manual verification"},headers={"X-Role":"admin"})
     assert proposal.status_code==200 and proposal.json()["approval_status"]=="pending"
     iid=proposal.json()["id"]
-    approval=client.patch(f"/api/interventions/{iid}/approval",json={"approved":True,"reason":"Reviewer approved enhanced monitoring for this case"})
+    approval=client.patch(f"/api/interventions/{iid}/approval",json={"approved":True,"reason":"Reviewer approved enhanced monitoring for this case"},headers={"X-Role":"admin"})
     assert approval.status_code==200 and approval.json()["approval_status"]=="approved"
     assert any(x["resource_id"]==cid for x in client.get("/api/audit").json())
 
