@@ -10,7 +10,7 @@ class CaseUpdate(BaseModel):
     status: str = Field(pattern="^(open|investigating|resolved|false_positive|escalated)$")
     note: str = Field(default="", max_length=2000)
     assigned_to: str | None = Field(default=None, max_length=120)
-    outcome: str | None = Field(default=None, max_length=32)
+    outcome: str | None = Field(default=None, pattern="^(legitimate_change|no_issue|policy_violation_suspected|inconclusive)$")
 
 class VerificationRequest(BaseModel):
     reason: str = Field(min_length=8, max_length=1000)
