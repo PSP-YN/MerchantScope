@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {Activity,AlertTriangle,ArrowDownRight,ArrowUpRight,ArrowUpRight as External,BarChart3,Bell,Building2,CheckCircle2,ChevronDown,ChevronRight,CircleHelp,ClipboardList,Clock3,Command,Download,Eye,FileCheck2,Filter,GitBranch,Layers3,Menu,Network,RefreshCw,Search,Shield,ShieldAlert,ShieldCheck,SlidersHorizontal,Store,Wallet,Workflow,X} from "lucide-react";
 import {Area,AreaChart,Bar,BarChart,CartesianGrid,Cell,ResponsiveContainer,Tooltip,XAxis,YAxis} from "recharts";
-import ReactFlow,{Background,Controls,MiniMap, type Edge,type Node} from "@xyflow/react";
+import {ReactFlow,Background,Controls,MiniMap, type Edge,type Node} from "@xyflow/react";
 
 const API=process.env.NEXT_PUBLIC_API_URL||"http://127.0.0.1:8000";
 type Signal={key:string;label:string;points:number;detail:string};
