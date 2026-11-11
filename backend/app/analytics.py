@@ -85,7 +85,10 @@ def evaluate_merchant(db:Session,merchant:Merchant,persist:bool=True):
             c["category"]=max(c["category"],80. if len(reasons)>=2 else 60.)
             signals.append({"key":"category_peer","label":"Merchant-category behaviour mismatch","points":15,"detail":"; ".join(reasons)+"."})
     if len(portfolio)>=20 and f["sufficient_history"]:
-        model=IsolationForest(n_estimators=100,contamination=.10,random_state=42);model.fit(portfolio)
+        model=db.info.get("trace_isolation_model")
+        if model is None:
+            model=IsolationForest(n_estimators=100,contamination=.10,random_state=42);model.fit(portfolio)
+            db.info["trace_isolation_model"]=model
         anomaly=float(model.decision_function([[f[k] for k in ["daily_count","avg_ticket","refund_rate","failed_rate","night_share","customer_concentration"]]])[0])
         if anomaly<-.08:c["behaviour"]=max(c["behaviour"],min(100,abs(anomaly)*500))
     available={k:v for k,v in c.items() if k not in {"behaviour","payment"} or f["sufficient_history"]};denom=sum(WEIGHTS[k] for k in available)
