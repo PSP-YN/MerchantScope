@@ -170,6 +170,12 @@ def approve_intervention(intervention_id:str,req:InterventionApproval,db:Session
     db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="intervention.approval_recorded",resource_type="intervention",resource_id=item.id,reason=req.reason));db.commit()
     return {"id":item.id,"approval_status":item.approval_status,"approved_by":item.approved_by}
 
+
+@app.get("/api/interventions")
+def list_interventions(db:Session=Depends(get_db)):
+    rows=db.scalars(select(Intervention).order_by(Intervention.created_at.desc())).all()
+    return [{"id":x.id,"investigation_id":x.investigation_id,"action":x.action,"reason":x.reason,"approved_by":x.approved_by,"approval_status":x.approval_status,"created_at":x.created_at.isoformat()} for x in rows]
+
 @app.get("/api/audit")
 def audit(limit:int=Query(200,ge=1,le=1000),db:Session=Depends(get_db)):
     rows=db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)).all()
