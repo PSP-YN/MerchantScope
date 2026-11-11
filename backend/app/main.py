@@ -38,6 +38,7 @@ def _case_dict(db,c):
     return {"id":c.id,"merchant_id":c.merchant_id,"merchant_name":m.name if m else c.merchant_id,"assessment_id":c.assessment_id,
       "risk_score":a.risk_score if a else 0,"confidence":a.confidence if a else 0,"risk_level":a.severity if a else "low","status":c.status,
       "assigned_to":c.assigned_to,"outcome":c.outcome,"signals":[{"key":s.key,"label":s.label,"points":s.points,"detail":s.detail} for s in signals],
+      "notes":[{"actor":n.actor,"note":n.note,"created_at":n.created_at.isoformat()} for n in db.scalars(select(InvestigationNote).where(InvestigationNote.investigation_id==c.id).order_by(InvestigationNote.created_at)).all()],
       "created_at":c.created_at.isoformat(),"updated_at":c.updated_at.isoformat()}
 
 @app.get("/health")
@@ -109,7 +110,8 @@ def simulate(req:ScenarioRequest,db:Session=Depends(get_db),actor:dict=Depends(a
     try:result=run_scenario(db,req.merchant_id,req.scenario)
     except LookupError as e:raise HTTPException(404,str(e))
     except ValueError as e:raise HTTPException(422,str(e))
-    db.info.pop("trace_portfolio_features",None)
+    db.info.pop("trace_portfolio_features",None);db.info.pop("trace_category_features",None)
+    db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="scenario.executed",resource_type="merchant",resource_id=req.merchant_id,reason=f"Executed synthetic scenario: {req.scenario}"))
     merchant=_merchant(db,req.merchant_id);assessment=evaluate_merchant(db,merchant,persist=True);db.commit()
     result["assessment"]=assessment
     return result
@@ -139,7 +141,9 @@ def update_investigation(case_id:str,update:CaseUpdate,db:Session=Depends(get_db
     c.status=update.status;c.updated_at=datetime.now(timezone.utc)
     if update.assigned_to is not None:c.assigned_to=update.assigned_to
     if update.outcome is not None:c.outcome=update.outcome
-    if update.note.strip():\n        db.add(InvestigationNote(investigation_id=c.id,actor=actor["actor"],note=update.note.strip()))\n        db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="investigation.note_added",resource_type="investigation",resource_id=c.id,reason=update.note.strip()))
+    if update.note.strip():
+        db.add(InvestigationNote(investigation_id=c.id,actor=actor["actor"],note=update.note.strip()))
+        db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="investigation.note_added",resource_type="investigation",resource_id=c.id,reason=update.note.strip()))
     db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="investigation.updated",resource_type="investigation",resource_id=c.id,reason=f"Status changed to {update.status}"));db.commit();return _case_dict(db,c)
 
 @app.post("/api/investigations/{case_id}/verification")
