@@ -1,7 +1,8 @@
 from __future__ import annotations
 import json, os, uuid
 from datetime import datetime, timezone
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
@@ -15,6 +16,15 @@ from .security import actor_context, require_role
 app=FastAPI(title="TRACE — Transaction Reality & Activity Consistency Engine",version="1.0.0",description="Explainable merchant-risk intelligence using synthetic demonstration data. Scores prioritize review and are not fraud probabilities.")
 origins=[x.strip() for x in os.getenv("CORS_ORIGINS","http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=False,allow_methods=["GET","POST","PATCH","OPTIONS"],allow_headers=["Authorization","Content-Type","X-Actor","X-Role"])
+@app.middleware("http")
+async def production_auth_gate(request:Request,call_next):
+    if os.getenv("APP_ENV","demo").lower()=="production" and request.url.path not in {"/health","/docs","/openapi.json","/redoc"}:
+        token=request.headers.get("Authorization","").removeprefix("Bearer ").strip()
+        valid={os.getenv("TRACE_ANALYST_TOKEN",""),os.getenv("TRACE_INVESTIGATOR_TOKEN",""),os.getenv("TRACE_ADMIN_TOKEN",""),os.getenv("TRACE_REVIEWER_TOKEN","")}
+        valid.discard("")
+        if not token or token not in valid:
+            return JSONResponse(status_code=401,content={"detail":"Authentication required"})
+    return await call_next(request)
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
