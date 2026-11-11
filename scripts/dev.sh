@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+PYTHON_BIN="${TRACE_PYTHON:-}"
+if [[ -z "$PYTHON_BIN" ]]; then
+  for candidate in python3.12 python3.13 python3.11; do
+    if command -v "$candidate" >/dev/null 2>&1; then PYTHON_BIN="$candidate"; break; fi
+  done
+fi
+if [[ -z "$PYTHON_BIN" ]]; then echo "Python 3.11, 3.12 or 3.13 is required. Set TRACE_PYTHON to an explicit interpreter."; exit 1; fi
+PYTHON_VERSION="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+case "$PYTHON_VERSION" in 3.11|3.12|3.13) ;; *) echo "Unsupported Python $PYTHON_VERSION. Use Python 3.11, 3.12 or 3.13."; exit 1 ;; esac
+if [[ ! -d backend/.venv ]]; then "$PYTHON_BIN" -m venv backend/.venv; fi
+source backend/.venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r backend/requirements.txt
+[[ -f backend/.env ]] || cp backend/.env.example backend/.env
+[[ -f frontend/.env.local ]] || cp frontend/.env.example frontend/.env.local
+(cd backend && exec uvicorn app.main:app --reload --host 127.0.0.1 --port 8000) &
+API_PID=$!
+(cd frontend && npm install && exec npm run dev) &
+WEB_PID=$!
+cleanup(){ kill "$API_PID" "$WEB_PID" 2>/dev/null || true; }
+trap cleanup EXIT INT TERM
+wait

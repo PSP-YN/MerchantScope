@@ -9,3 +9,13 @@ dist/
 .coverage
 
 *.tsbuildinfo
+.next/
+.env.local
+frontend/.next/
+backend/trace_demo.db
+*.sqlite
+*.sqlite3
+playwright-report/
+test-results/
+backend/trace_test.sqlite
+evaluation/reports/latest-benchmark.json
