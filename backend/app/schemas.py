@@ -34,3 +34,7 @@ class MerchantOut(BaseModel):
     name: str
     category: str
     status: str
+
+class ContextReview(BaseModel):
+    verification_status: str = Field(pattern="^(unverified|partially_verified|verified|rejected)$")
+    review_reason: str = Field(min_length=8, max_length=1000)
