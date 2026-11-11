@@ -91,7 +91,7 @@ def evaluate_merchant(db:Session,merchant:Merchant,persist:bool=True):
     available={k:v for k,v in c.items() if k not in {"behaviour","payment"} or f["sufficient_history"]};denom=sum(WEIGHTS[k] for k in available)
     score=round(sum(WEIGHTS[k]*v for k,v in available.items())/denom,1) if denom else 0.
     confidence=round(100*((.45 if f["sufficient_history"] else .05)+(.20 if entities else 0)+(.15 if events else 0)+(.20 if len(portfolio)>=20 else 0)),1)
-    severity="high" if score>=50 else "medium" if score>=20 else "low"
+    severity="high" if score>=40 else "medium" if score>=20 else "low"
     explanation=f"{len(signals)} explainable signal(s); {len(available)} score dimensions available. Score is a review-priority index, not a probability."
     result={"risk_score":score,"confidence":confidence,"severity":severity,"signals":signals,"components":c,"features":f,"graph":{"shared_entities":entities,"shared_entity_count":degree},"explanation":explanation}
     if persist:
