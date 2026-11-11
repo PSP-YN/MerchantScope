@@ -62,12 +62,28 @@ def evaluate_merchant(db:Session,merchant:Merchant,persist:bool=True):
     events=db.scalars(select(MerchantEvent).where(MerchantEvent.merchant_id==merchant.id)).all();unverified=[e for e in events if e.verification_status!="verified"]
     if unverified:c["context"]=min(100,20*len(unverified));signals.append({"key":"context","label":"Business-change context is unverified","points":5,"detail":f"{len(unverified)} declared context event(s) are not independently verified."})
     portfolio=db.info.get("trace_portfolio_features")
-    if portfolio is None:
-        portfolio=[]
+    category_features=db.info.get("trace_category_features")
+    if portfolio is None or category_features is None:
+        portfolio=[];category_features={}
         for m in db.scalars(select(Merchant)).all():
             ff=merchant_features(db,m)
-            if ff["sufficient_history"]:portfolio.append([ff[k] for k in ["daily_count","avg_ticket","refund_rate","failed_rate","night_share","customer_concentration"]])
+            if ff["sufficient_history"]:
+                portfolio.append([ff[k] for k in ["daily_count","avg_ticket","refund_rate","failed_rate","night_share","customer_concentration"]])
+                category_features.setdefault(m.category,[]).append(ff)
         db.info["trace_portfolio_features"]=portfolio
+        db.info["trace_category_features"]=category_features
+    peers=category_features.get(merchant.category,[])
+    if len(peers)>=5 and f["sufficient_history"]:
+        med=lambda key:float(pd.Series([x[key] for x in peers]).median())
+        peer_checks=[("avg_ticket",1.6,"average ticket is unusually high for this merchant category"),("daily_count",2.5,"transaction frequency is unusually high for this merchant category")]
+        reasons=[]
+        for key,mult,reason in peer_checks:
+            if f[key]>max(.001,med(key))*mult:reasons.append(reason)
+        if f["refund_rate"]>med("refund_rate")+.10:reasons.append("refund rate is materially above category peers")
+        if f["night_share"]>med("night_share")+.20:reasons.append("late-hour activity is materially above category peers")
+        if reasons:
+            c["category"]=max(c["category"],80. if len(reasons)>=2 else 60.)
+            signals.append({"key":"category_peer","label":"Merchant-category behaviour mismatch","points":15,"detail":"; ".join(reasons)+"."})
     if len(portfolio)>=20 and f["sufficient_history"]:
         model=IsolationForest(n_estimators=100,contamination=.10,random_state=42);model.fit(portfolio)
         anomaly=float(model.decision_function([[f[k] for k in ["daily_count","avg_ticket","refund_rate","failed_rate","night_share","customer_concentration"]]])[0])
@@ -75,7 +91,7 @@ def evaluate_merchant(db:Session,merchant:Merchant,persist:bool=True):
     available={k:v for k,v in c.items() if k not in {"behaviour","payment"} or f["sufficient_history"]};denom=sum(WEIGHTS[k] for k in available)
     score=round(sum(WEIGHTS[k]*v for k,v in available.items())/denom,1) if denom else 0.
     confidence=round(100*((.45 if f["sufficient_history"] else .05)+(.20 if entities else 0)+(.15 if events else 0)+(.20 if len(portfolio)>=20 else 0)),1)
-    severity="high" if score>=65 else "medium" if score>=35 else "low"
+    severity="high" if score>=50 else "medium" if score>=20 else "low"
     explanation=f"{len(signals)} explainable signal(s); {len(available)} score dimensions available. Score is a review-priority index, not a probability."
     result={"risk_score":score,"confidence":confidence,"severity":severity,"signals":signals,"components":c,"features":f,"graph":{"shared_entities":entities,"shared_entity_count":degree},"explanation":explanation}
     if persist:
