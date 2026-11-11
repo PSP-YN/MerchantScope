@@ -72,7 +72,7 @@ def run_scenario(db:Session,merchant_id:str,scenario:str):
     if scenario not in SCENARIOS:raise ValueError("Unknown scenario")
     merchant=db.get(Merchant,merchant_id)
     if not merchant:raise LookupError("Merchant not found")
-    now=datetime.now(timezone.utc);idx=int(merchant_id.split("-")[-1]);db.execute(delete(Transaction).where(Transaction.merchant_id==merchant_id))
+    now=datetime.now(timezone.utc)\n    try:idx=int(merchant_id.rsplit("-",1)[1])\n    except (ValueError,IndexError):idx=int(uuid.uuid5(uuid.NAMESPACE_URL,merchant_id).hex[:8],16)%100000+1\n    db.execute(delete(Transaction).where(Transaction.merchant_id==merchant_id))
     rows=_make_tx(merchant.id,idx,merchant.category,scenario,random.Random(1000+idx+sum(map(ord,scenario))),now);db.add_all(rows)
     db.execute(delete(MerchantEvent).where(MerchantEvent.merchant_id==merchant_id));merchant.scenario_label=scenario
     if scenario in {"festival","expansion","mixed_signals"}:
