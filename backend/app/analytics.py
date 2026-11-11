@@ -37,7 +37,7 @@ def graph_metrics(db:Session,merchant_id:str):
         for token,count in shared:
             node=f"{kind}:{token}";G.add_node(node,kind=kind);G.add_edge(merchant_id,node,relation=f"shared_{kind}")
             evidence.append({"entity_id":node,"entity_type":kind,"merchant_count":int(count),"evidence_count":sum(1 for r in rows if getattr(r,attr)==token)})
-    return min(100,len(evidence)*12),int(G.degree(merchant_id)),evidence,G
+    return min(100,sum(min(100,(x["merchant_count"]-1)*12) for x in evidence)),int(G.degree(merchant_id)),evidence,G
 
 def evaluate_merchant(db:Session,merchant:Merchant,persist:bool=True):
     f=merchant_features(db,merchant);p=merchant.profile;signals=[];c={"behaviour":0.,"category":0.,"graph":0.,"payment":0.,"context":0.}
