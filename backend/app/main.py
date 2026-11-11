@@ -27,6 +27,13 @@ async def production_auth_gate(request:Request,call_next):
     return await call_next(request)
 @app.on_event("startup")
 def startup():
+    env=os.getenv("APP_ENV","demo").lower()
+    if env=="production":
+        required=["TRACE_ANALYST_TOKEN","TRACE_INVESTIGATOR_TOKEN","TRACE_ADMIN_TOKEN","TRACE_REVIEWER_TOKEN"]
+        missing=[key for key in required if not os.getenv(key)]
+        if missing:raise RuntimeError("Missing production security configuration: "+", ".join(missing))
+        if os.getenv("DATABASE_URL","").startswith("sqlite"):raise RuntimeError("Production requires PostgreSQL; configure DATABASE_URL.")
+        return
     Base.metadata.create_all(bind=engine)
     from .db import SessionLocal
     db=SessionLocal()
@@ -268,4 +275,5 @@ def evaluation(db:Session=Depends(get_db)):
 @app.post("/api/admin/seed")
 def reseed(force:bool=False,db:Session=Depends(get_db),actor:dict=Depends(actor_context)):
     require_role(actor,{"admin"})
+    if os.getenv("APP_ENV","demo").lower()=="production":raise HTTPException(403,"Synthetic data seeding is disabled in production.")
     return seed_demo(db,force=force)
