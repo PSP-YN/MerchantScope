@@ -13,3 +13,6 @@
 
 .category-eval{display:grid;grid-template-columns:1fr 1fr;gap:12px}.category-eval>div{display:grid;grid-template-columns:85px 1fr auto;gap:8px;align-items:center}.category-eval span{font-size:9px;text-transform:capitalize;color:#bac6bd}.category-eval b{font-size:10px;color:#e2e9e2}.category-eval small{grid-column:2/4;color:#7e8c83;font-size:8px}.category-score{height:5px;border-radius:5px;background:#27342d;overflow:hidden}.category-score i{display:block;height:100%;background:#c88d42;border-radius:5px}
 @media(max-width:760px){.category-eval{grid-template-columns:1fr}}
+
+.context-create{display:grid;grid-template-columns:170px 1fr auto;gap:7px;border-top:1px solid #26332d;padding-top:12px;margin-top:12px}.context-create select,.context-create input{min-width:0;background:#0d1511;border:1px solid #2b3930;border-radius:5px;color:#cdd7cf;padding:8px;font-size:9px}
+@media(max-width:760px){.context-create{grid-template-columns:1fr}.context-create .btn{justify-content:center}}
