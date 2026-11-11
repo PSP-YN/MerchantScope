@@ -2,6 +2,7 @@ from __future__ import annotations
 import json, os, uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +28,12 @@ async def lifespan(app:FastAPI):
         if len(set(token_values))!=len(token_values):raise RuntimeError("Each production role must have a distinct bearer token.")
         db_url=os.getenv("DATABASE_URL","")
         if not db_url.startswith("postgresql"):raise RuntimeError("Production requires a PostgreSQL DATABASE_URL; configure it before startup.")
+        from alembic import command
+        from alembic.config import Config
+        backend_dir=Path(__file__).resolve().parents[1]
+        migration_config=Config(str(backend_dir/"alembic.ini"))
+        migration_config.set_main_option("script_location",str(backend_dir/"migrations"))
+        command.upgrade(migration_config,"head")
     else:
         Base.metadata.create_all(bind=engine)
         from .db import SessionLocal
