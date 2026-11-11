@@ -11,6 +11,7 @@ def actor_context(authorization: str | None = Header(default=None), x_actor: str
         os.getenv("TRACE_ANALYST_TOKEN", ""): "analyst",
         os.getenv("TRACE_INVESTIGATOR_TOKEN", ""): "investigator",
         os.getenv("TRACE_ADMIN_TOKEN", ""): "admin",
+        os.getenv("TRACE_REVIEWER_TOKEN", ""): "reviewer",
     }
     token = (authorization or "").removeprefix("Bearer ").strip()
     role = tokens.get(token)
