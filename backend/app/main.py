@@ -10,7 +10,7 @@ from .db import Base, engine, get_db
 from .models import Merchant, Transaction, MerchantEvent, RiskAssessment, RiskSignal, Investigation, Intervention, AuditLog, EntityNode, EntityEdge, InvestigationNote
 from .analytics import evaluate_merchant, merchant_features
 from .generator import seed_demo, run_scenario, rebuild_graph, SCENARIOS
-from .schemas import CaseUpdate, VerificationRequest, InterventionRequest, InterventionApproval, ScenarioRequest, ContextReview, MerchantCreate, TransactionBatch
+from .schemas import CaseUpdate, VerificationRequest, InterventionRequest, InterventionApproval, ScenarioRequest, ContextReview, MerchantCreate, TransactionBatch, MerchantEventCreate
 from .security import actor_context, require_role
 
 app=FastAPI(title="TRACE — Transaction Reality & Activity Consistency Engine",version="1.0.0",description="Explainable merchant-risk intelligence using synthetic demonstration data. Scores prioritize review and are not fraud probabilities.")
@@ -135,6 +135,18 @@ def review_context(event_id:str,req:ContextReview,db:Session=Depends(get_db),act
     db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="context.reviewed",resource_type="merchant_event",resource_id=event.id,reason=f"{previous} -> {req.verification_status}: {req.review_reason}"))
     db.commit()
     return {"id":event.id,"verification_status":event.verification_status,"review_reason":req.review_reason}
+
+
+@app.post("/api/merchants/{merchant_id}/events")
+def create_context_event(merchant_id:str,req:MerchantEventCreate,db:Session=Depends(get_db),actor:dict=Depends(actor_context)):
+    require_role(actor,{"analyst","investigator","admin"})
+    merchant=_merchant(db,merchant_id)
+    event_id=f"evt_{uuid.uuid4().hex[:12]}"
+    stamp=req.effective_at if req.effective_at.tzinfo else req.effective_at.replace(tzinfo=timezone.utc)
+    event=MerchantEvent(id=event_id,merchant_id=merchant.id,event_type=req.event_type,description=req.description,verification_status="unverified",effective_at=stamp)
+    db.add(event);db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="context.declared",resource_type="merchant_event",resource_id=event_id,reason=f"Merchant context declared: {req.event_type}. Pending verification."))
+    db.commit()
+    return {"id":event.id,"merchant_id":event.merchant_id,"event_type":event.event_type,"description":event.description,"verification_status":event.verification_status,"effective_at":event.effective_at.isoformat()}
 
 @app.get("/api/merchants/{merchant_id}/transactions")
 def merchant_transactions(merchant_id:str,limit:int=Query(100,ge=1,le=1000),offset:int=Query(0,ge=0),db:Session=Depends(get_db)):
