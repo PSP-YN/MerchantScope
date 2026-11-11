@@ -18,3 +18,4 @@ backend/trace_demo.db
 playwright-report/
 test-results/
 backend/trace_test.sqlite
+evaluation/reports/
