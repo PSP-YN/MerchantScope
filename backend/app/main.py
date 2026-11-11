@@ -25,7 +25,8 @@ async def lifespan(app:FastAPI):
         weak=[key for key in required if len(os.getenv(key,""))<32]
         if weak:raise RuntimeError("Production bearer tokens must be at least 32 characters: "+", ".join(weak))
         if len(set(token_values))!=len(token_values):raise RuntimeError("Each production role must have a distinct bearer token.")
-        db_url=os.getenv("DATABASE_URL","")\n        if not db_url.startswith("postgresql"):raise RuntimeError("Production requires a PostgreSQL DATABASE_URL; configure it before startup.")
+        db_url=os.getenv("DATABASE_URL","")
+        if not db_url.startswith("postgresql"):raise RuntimeError("Production requires a PostgreSQL DATABASE_URL; configure it before startup.")
     else:
         Base.metadata.create_all(bind=engine)
         from .db import SessionLocal
