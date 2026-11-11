@@ -19,19 +19,25 @@ def _aware(dt): return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else
 
 def merchant_features(db:Session, merchant:Merchant, window_days:int=30):
     rows=db.scalars(select(Transaction).where(Transaction.merchant_id==merchant.id).order_by(Transaction.occurred_at)).all()
-    if not rows:return {"sufficient_history":False,"sample_size":0,"transaction_count":0,"daily_count":0,"avg_ticket":0,"refund_rate":0,"failed_rate":0,"night_share":0,"customer_concentration":0}
+    if not rows:return {"sufficient_history":False,"sample_size":0,"transaction_count":0,"daily_count":0,"avg_ticket":0,"refund_rate":0,"failed_rate":0,"night_share":0,"customer_concentration":0,"baseline_daily_count":0,"baseline_avg_ticket":0,"baseline_refund_rate":0,"baseline_failed_rate":0,"baseline_night_share":0,"baseline_customer_concentration":0}
     df=pd.DataFrame([{"amount":r.amount,"status":r.status,"customer":r.customer_token,"hour":_aware(r.occurred_at).hour,"occurred_at":_aware(r.occurred_at)} for r in rows])
     cutoff=max(df.occurred_at)-timedelta(days=window_days); current=df[df.occurred_at>=cutoff]; baseline=df[df.occurred_at<cutoff]
     if current.empty:current=df.tail(min(len(df),30))
     daily=current.groupby(current.occurred_at.dt.date).size(); cust=current.customer.value_counts(normalize=True); p=merchant.profile
     enough=len(baseline)>=30 and len(current)>=10
+    base_daily=float(baseline.groupby(baseline.occurred_at.dt.date).size().mean()) if not baseline.empty else 0
+    base_ticket=float(baseline.amount.mean()) if not baseline.empty else 0
+    base_refund=float(baseline.status.eq("refunded").mean()) if not baseline.empty else 0
+    base_failed=float(baseline.status.eq("failed").mean()) if not baseline.empty else 0
+    base_night=float((baseline.hour.lt(7)|baseline.hour.ge(22)).mean()) if not baseline.empty else 0
+    base_concentration=float(baseline.customer.value_counts(normalize=True).head(5).sum()) if not baseline.empty else 0
     if p and enough:
-        p.baseline_daily_count=float(baseline.groupby(baseline.occurred_at.dt.date).size().mean());p.baseline_avg_ticket=float(baseline.amount.mean())
-        p.baseline_refund_rate=float(baseline.status.eq("refunded").mean());p.baseline_failed_rate=float(baseline.status.eq("failed").mean())
-        p.baseline_night_share=float((baseline.hour.lt(7)|baseline.hour.ge(22)).mean());p.baseline_customer_concentration=float(baseline.customer.value_counts(normalize=True).head(5).sum())
+        p.baseline_daily_count=base_daily;p.baseline_avg_ticket=base_ticket;p.baseline_refund_rate=base_refund;p.baseline_failed_rate=base_failed
+        p.baseline_night_share=base_night;p.baseline_customer_concentration=base_concentration
     return {"sufficient_history":enough,"sample_size":len(baseline),"transaction_count":len(current),"daily_count":float(daily.mean()) if len(daily) else 0,
         "avg_ticket":float(current.amount.mean()),"refund_rate":float(current.status.eq("refunded").mean()),"failed_rate":float(current.status.eq("failed").mean()),
-        "night_share":float((current.hour.lt(7)|current.hour.ge(22)).mean()),"customer_concentration":float(cust.head(5).sum()) if len(cust) else 0}
+        "night_share":float((current.hour.lt(7)|current.hour.ge(22)).mean()),"customer_concentration":float(cust.head(5).sum()) if len(cust) else 0,
+        "baseline_daily_count":base_daily,"baseline_avg_ticket":base_ticket,"baseline_refund_rate":base_refund,"baseline_failed_rate":base_failed,"baseline_night_share":base_night,"baseline_customer_concentration":base_concentration}
 
 def graph_metrics(db:Session,merchant_id:str):
     rows=db.scalars(select(Transaction).where(Transaction.merchant_id==merchant_id)).all();G=nx.Graph();G.add_node(merchant_id,kind="merchant");evidence=[]
@@ -82,7 +88,7 @@ def evaluate_merchant(db:Session,merchant:Merchant,persist:bool=True):
         for m in db.scalars(select(Merchant)).all():
             ff=merchant_features(db,m)
             if ff["sufficient_history"]:
-                portfolio.append([ff[k] for k in ["daily_count","avg_ticket","refund_rate","failed_rate","night_share","customer_concentration"]])
+                portfolio.append([ff[k] for k in ["baseline_daily_count","baseline_avg_ticket","baseline_refund_rate","baseline_failed_rate","baseline_night_share","baseline_customer_concentration"]])
                 category_features.setdefault(m.category,[]).append(ff)
         db.info["trace_portfolio_features"]=portfolio
         db.info["trace_category_features"]=category_features
