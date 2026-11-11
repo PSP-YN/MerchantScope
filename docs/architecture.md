@@ -1,22 +1,24 @@
-# Architecture
+# TRACE architecture
+
+TRACE is a merchant-risk decision-support prototype. It is not a payment authorization, blocking, or fraud-verdict system.
 
 ## Runtime flow
+1. FastAPI receives normalized merchant and transaction data.
+2. SQLAlchemy persists merchants, profiles, transactions, context events, features, risk assessments, signals, graph entities, investigations, interventions, and audit records.
+3. Pandas and NumPy compute merchant-specific historical and current-window features.
+4. Statistical rules and Isolation Forest identify deviations; NetworkX evaluates shared pseudonymous entities.
+5. An explainable weighted score is normalized over available dimensions. Missing dimensions reduce confidence and are excluded from the score denominator.
+6. Analysts open investigations, request verification, and record outcomes. Consequential interventions require separate reviewer approval; no payment action is executed.
+7. Model evaluation compares a static threshold baseline with TRACE against scenario labels generated independently from features.
 
-1. FastAPI serves dashboard, merchant, transaction, relationship, and case endpoints.
-2. `engine.py` supplies deterministic synthetic merchant observations and computes additive rule-based signals.
-3. The React client fetches the API, renders portfolio metrics, merchant-level explanations, and the review queue.
-4. Case status changes are handled by a human analyst through the API.
+## Risk model
+Configured weights: behaviour 25%, category consistency 25%, graph relationships 25%, payment anomalies 15%, unresolved context 10%. Components are normalized to 0–100. Available weights are renormalized when data is missing. Confidence is separate. Scores are review-priority indices, not probabilities.
 
-## Risk score
+## Data model
+Normalized SQLAlchemy entities are in backend/app/models.py. SQLite is the zero-configuration local default; PostgreSQL URLs are supported through DATABASE_URL. The demo creates tables on startup; the migration directory contains the versioned schema bootstrap.
 
-The current score is a transparent heuristic, not a statistical model. Independent checks compare five current merchant metrics with a fixed per-merchant demo baseline: transaction volume, average ticket, refund rate, late-hour activity, and top payment-instrument concentration. Signal points are summed and capped at 100. Thresholds map the score to low, medium, or high review priority.
+## Synthetic dataset
+A deterministic seed generates 100 merchants in five categories and approximately 40,000 transactions over 90 days. All rows and entity fingerprints are synthetic. No PayU integration or real customer information is present.
 
-The seasonal uplift scenario intentionally has elevated volume without correlated refund, ticket-size, late-hour, or concentration anomalies. It therefore remains low priority. The behaviour-shift scenario combines several deviations and receives a high score.
-
-## Prototype limitations
-
-- No persistence: cases are stored in process memory and reset when the API restarts.
-- No identity, authentication, authorization, or tenant isolation.
-- No real payment processor or PayU integration.
-- No calibrated model, labelled training corpus, precision/recall evaluation, or drift monitoring.
-- Synthetic graph fingerprints are illustrative only and are not evidence of real-world links.
+## Production hardening still required
+A payment-provider pilot requires authorized data access, production identity provider integration, tenant isolation, key management, database migrations in the deployment pipeline, retention controls, privacy/legal review, representative model validation, monitoring, incident response, and formal intervention governance.
