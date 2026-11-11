@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from .db import Base, engine, get_db
-from .models import Merchant, Transaction, MerchantEvent, RiskAssessment, RiskSignal, Investigation, Intervention, AuditLog, EntityNode, EntityEdge
+from .models import Merchant, Transaction, MerchantEvent, RiskAssessment, RiskSignal, Investigation, Intervention, AuditLog, EntityNode, EntityEdge, InvestigationNote
 from .analytics import evaluate_merchant, merchant_features
 from .generator import seed_demo, run_scenario, SCENARIOS
 from .schemas import CaseUpdate, VerificationRequest, InterventionRequest, InterventionApproval, ScenarioRequest
@@ -139,7 +139,7 @@ def update_investigation(case_id:str,update:CaseUpdate,db:Session=Depends(get_db
     c.status=update.status;c.updated_at=datetime.now(timezone.utc)
     if update.assigned_to is not None:c.assigned_to=update.assigned_to
     if update.outcome is not None:c.outcome=update.outcome
-    if update.note.strip():db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="investigation.note_added",resource_type="investigation",resource_id=c.id,reason=update.note.strip()))
+    if update.note.strip():\n        db.add(InvestigationNote(investigation_id=c.id,actor=actor["actor"],note=update.note.strip()))\n        db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="investigation.note_added",resource_type="investigation",resource_id=c.id,reason=update.note.strip()))
     db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="investigation.updated",resource_type="investigation",resource_id=c.id,reason=f"Status changed to {update.status}"));db.commit();return _case_dict(db,c)
 
 @app.post("/api/investigations/{case_id}/verification")
@@ -147,7 +147,7 @@ def request_verification(case_id:str,req:VerificationRequest,db:Session=Depends(
     require_role(actor,{"analyst","investigator","admin"});c=db.get(Investigation,case_id)
     if not c:raise HTTPException(404,"Investigation not found")
     item=Intervention(id=f"int_{uuid.uuid4().hex[:12]}",investigation_id=c.id,action="verification_request",reason=f"{req.reason} Requested: {req.requested_document}",approved_by=actor["actor"],approval_status="requested")
-    db.add(item);db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="verification.requested",resource_type="investigation",resource_id=c.id,reason=req.reason));db.commit()
+    db.add(item);db.add(InvestigationNote(investigation_id=c.id,actor=actor["actor"],note=f"Verification requested: {req.reason} Requested document: {req.requested_document}"));db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="verification.requested",resource_type="investigation",resource_id=c.id,reason=req.reason));db.commit()
     return {"id":item.id,"status":item.approval_status,"action":item.action,"reason":item.reason}
 
 @app.post("/api/investigations/{case_id}/interventions")
