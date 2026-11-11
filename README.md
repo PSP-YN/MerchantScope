@@ -31,6 +31,8 @@ TRACE helps payment risk teams distinguish legitimate merchant evolution from su
 
 Requirements: Python 3.11+, Node.js 20+, npm.
 
+For a single-command local startup, run `bash scripts/dev.sh` from the repository root. It creates the backend virtual environment, installs dependencies, copies local example environment files when absent, and starts the API and frontend. Stop both services with Ctrl+C.
+
 ### 1. Start the API
 
 ```bash
@@ -44,7 +46,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 On first start, TRACE creates the relational schema and seeds 100 synthetic merchants with approximately 40,000 transactions across 90 days. The process is deterministic in scenario assignment and random seed; transaction IDs and timestamps are generated at seed time.
 
-API documentation: http://127.0.0.1:8000/docs
+API documentation: http://127.0.0.1:8000/docs. The API includes merchant creation, transaction batch ingestion, structured context declaration/review, merchant assessment, scenario execution, investigation and intervention workflows, audit retrieval, and model evaluation.
 
 ### 2. Start the frontend
 
