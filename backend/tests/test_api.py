@@ -73,3 +73,5 @@ def test_merchant_creation_and_transaction_ingestion(client):
     assert ingested.status_code==200 and ingested.json()["accepted"]==1
     detail=client.get(f"/api/merchants/{mid}/transactions?limit=5").json()
     assert len(detail["items"])==1 and detail["items"][0]["amount"]==425.5
+    scenario=client.post("/api/scenarios/run",json={"merchant_id":mid,"scenario":"festival"})
+    assert scenario.status_code==200 and scenario.json()["transactions_replaced"]>=300
