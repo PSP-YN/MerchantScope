@@ -1,4 +1,7 @@
 name: TRACE CI
+concurrency:
+  group: trace-ci-${{ github.ref }}
+  cancel-in-progress: true
 on:
   push:
     branches: [main, trace-production]
