@@ -34,7 +34,7 @@ async def lifespan(app:FastAPI):
         finally:db.close()
     yield
 
-app=FastAPI(title="TRACE — Transaction Reality & Activity Consistency Engine",version="1.0.0",description="Explainable merchant-risk intelligence. Synthetic demo by default; scores prioritize review and are not fraud probabilities."),lifespan=lifespan)
+app=FastAPI(title="TRACE — Transaction Reality & Activity Consistency Engine",version="1.0.0",description="Explainable merchant-risk intelligence. Synthetic demo by default; scores prioritize review and are not fraud probabilities.",lifespan=lifespan)
 origins=[x.strip() for x in os.getenv("CORS_ORIGINS","http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=False,allow_methods=["GET","POST","PATCH","OPTIONS"],allow_headers=["Authorization","Content-Type","X-Actor","X-Role"])
 @app.middleware("http")
