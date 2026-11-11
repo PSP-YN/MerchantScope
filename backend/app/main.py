@@ -32,6 +32,10 @@ def startup():
         required=["TRACE_ANALYST_TOKEN","TRACE_INVESTIGATOR_TOKEN","TRACE_ADMIN_TOKEN","TRACE_REVIEWER_TOKEN"]
         missing=[key for key in required if not os.getenv(key)]
         if missing:raise RuntimeError("Missing production security configuration: "+", ".join(missing))
+        token_values=[os.getenv(key,"") for key in required]
+        weak=[key for key in required if len(os.getenv(key,""))<32]
+        if weak:raise RuntimeError("Production bearer tokens must be at least 32 characters: "+", ".join(weak))
+        if len(set(token_values))!=len(token_values):raise RuntimeError("Each production role must have a distinct bearer token.")
         if os.getenv("DATABASE_URL","").startswith("sqlite"):raise RuntimeError("Production requires PostgreSQL; configure DATABASE_URL.")
         return
     Base.metadata.create_all(bind=engine)
