@@ -25,7 +25,7 @@ TRACE helps payment risk teams distinguish legitimate merchant evolution from su
 - Backend: FastAPI, Pydantic, SQLAlchemy.
 - Storage: SQLite for local demo; PostgreSQL via DATABASE_URL.
 - Analytics: Pandas, NumPy, scikit-learn Isolation Forest, NetworkX.
-- Tests: Pytest, FastAPI integration tests, Next.js production build CI.
+- Tests: Pytest, FastAPI integration tests, Playwright browser acceptance tests, Next.js production build CI.
 
 ## Quick start
 
@@ -72,11 +72,12 @@ cd ../frontend
 npm run test:e2e
 ```
 
-Frontend production build and browser acceptance tests:
+Frontend production build:
 
 ```bash
 cd frontend
 npm run build
+npm run test:e2e
 ```
 
 ## Database
