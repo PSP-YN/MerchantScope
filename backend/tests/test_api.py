@@ -62,6 +62,7 @@ def test_graph_and_evaluation(client):
     assert graph["nodes"] and graph["edges"]
     evaluation=client.get("/api/evaluation").json()
     assert 0<=evaluation["trace_contextual"]["f1"]<=1
+    assert evaluation["detection_delay_days"]["eligible_scenarios"]>0
 
 def test_merchant_creation_and_transaction_ingestion(client):
     merchant=client.post("/api/merchants",json={"name":"Test Ledger Bakery","category":"bakery","declared_description":"Synthetic API ingestion test"},headers={"X-Role":"admin"})
