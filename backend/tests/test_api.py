@@ -55,3 +55,13 @@ def test_graph_and_evaluation(client):
     assert graph["nodes"] and graph["edges"]
     evaluation=client.get("/api/evaluation").json()
     assert 0<=evaluation["trace_contextual"]["f1"]<=1
+
+def test_merchant_creation_and_transaction_ingestion(client):
+    merchant=client.post("/api/merchants",json={"name":"Test Ledger Bakery","category":"bakery","declared_description":"Synthetic API ingestion test"},headers={"X-Role":"admin"})
+    assert merchant.status_code==200
+    mid=merchant.json()["id"]
+    batch={"transactions":[{"merchant_id":mid,"amount":425.5,"status":"settled","channel":"upi","customer_token":"customer:test:01","device_token":"device:test:01","settlement_token":"settlement:test:01","synthetic":True}]}
+    ingested=client.post("/api/transactions/ingest",json=batch,headers={"X-Role":"admin"})
+    assert ingested.status_code==200 and ingested.json()["accepted"]==1
+    detail=client.get(f"/api/merchants/{mid}/transactions?limit=5").json()
+    assert len(detail["items"])==1 and detail["items"][0]["amount"]==425.5
