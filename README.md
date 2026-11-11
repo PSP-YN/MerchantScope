@@ -68,9 +68,11 @@ cd backend
 pytest -q
 cd ../evaluation
 python run.py
+cd ../frontend
+npm run test:e2e
 ```
 
-Frontend production build:
+Frontend production build and browser acceptance tests:
 
 ```bash
 cd frontend
