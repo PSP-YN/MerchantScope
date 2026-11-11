@@ -30,6 +30,14 @@ def test_investigation_verification_and_audit():
     assert update.status_code==200 and update.json()["status"]=="investigating"
     v=client.post(f"/api/investigations/{cid}/verification",json={"reason":"Confirm the declared operating change","requested_document":"Business registration"})
     assert v.status_code==200
+    refreshed=client.get("/api/investigations").json()
+    saved=next(x for x in refreshed if x["id"]==cid)
+    assert any("declared operating change" in n["note"] for n in saved["notes"])
+    proposal=client.post(f"/api/investigations/{cid}/interventions",json={"action":"enhanced_monitoring","reason":"Maintain monitoring during manual verification"})
+    assert proposal.status_code==200 and proposal.json()["approval_status"]=="pending"
+    iid=proposal.json()["id"]
+    approval=client.patch(f"/api/interventions/{iid}/approval",json={"approved":True,"reason":"Reviewer approved enhanced monitoring for this case"})
+    assert approval.status_code==200 and approval.json()["approval_status"]=="approved"
     assert any(x["resource_id"]==cid for x in client.get("/api/audit").json())
 
 def test_graph_and_evaluation():
