@@ -9,8 +9,8 @@ from sqlalchemy import select, func
 from .db import Base, engine, get_db
 from .models import Merchant, Transaction, MerchantEvent, RiskAssessment, RiskSignal, Investigation, Intervention, AuditLog, EntityNode, EntityEdge, InvestigationNote
 from .analytics import evaluate_merchant, merchant_features
-from .generator import seed_demo, run_scenario, SCENARIOS
-from .schemas import CaseUpdate, VerificationRequest, InterventionRequest, InterventionApproval, ScenarioRequest, ContextReview
+from .generator import seed_demo, run_scenario, rebuild_graph, SCENARIOS
+from .schemas import CaseUpdate, VerificationRequest, InterventionRequest, InterventionApproval, ScenarioRequest, ContextReview, MerchantCreate, TransactionBatch
 from .security import actor_context, require_role
 
 app=FastAPI(title="TRACE — Transaction Reality & Activity Consistency Engine",version="1.0.0",description="Explainable merchant-risk intelligence using synthetic demonstration data. Scores prioritize review and are not fraud probabilities.")
@@ -74,6 +74,39 @@ def dashboard(db:Session=Depends(get_db)):
     recent=db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(8)).all()
     recent_activity=[{"actor":x.actor,"action":x.action,"resource_type":x.resource_type,"resource_id":x.resource_id,"reason":x.reason,"created_at":x.created_at.isoformat()} for x in recent]
     return {"data_mode":"SYNTHETIC DEMO DATA","generated_at":datetime.now(timezone.utc).isoformat(),"metrics":{"merchants_monitored":len(items),"transactions_monitored":total_tx,"high_risk_merchants":high,"open_investigations":open_cases,"verification_requests":verification,"legitimate_anomalies":sum(any(sig["key"]=="context" for sig in x["signals"]) and x["risk_level"]=="low" for x in items),"review_queue":high+med},"merchants":items,"scenarios":SCENARIOS,"risk_trend":sorted(trend_map.values(),key=lambda x:x["date"]),"recent_activity":recent_activity}
+
+
+@app.post("/api/merchants")
+def create_merchant(req:MerchantCreate,db:Session=Depends(get_db),actor:dict=Depends(actor_context)):
+    require_role(actor,{"admin"})
+    mid=f"m_{uuid.uuid4().hex[:12]}"
+    merchant=Merchant(id=mid,name=req.name,category=req.category,declared_description=req.declared_description,status="active")
+    db.add(merchant);db.add(MerchantProfile(merchant_id=mid,baseline_days=60));db.add(EntityNode(id=mid,entity_type="merchant",label=req.name,synthetic=True))
+    db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="merchant.created",resource_type="merchant",resource_id=mid,reason="Merchant profile created through the authenticated API."))
+    db.commit()
+    return {"id":mid,"name":merchant.name,"category":merchant.category,"status":merchant.status}
+
+@app.post("/api/transactions/ingest")
+def ingest_transactions(batch:TransactionBatch,db:Session=Depends(get_db),actor:dict=Depends(actor_context)):
+    require_role(actor,{"analyst","investigator","admin"})
+    merchant_ids={x.merchant_id for x in batch.transactions}
+    merchants={m.id:m for m in db.scalars(select(Merchant).where(Merchant.id.in_(merchant_ids))).all()}
+    missing=merchant_ids-set(merchants)
+    if missing:raise HTTPException(404,detail={"message":"Unknown merchant IDs","merchant_ids":sorted(missing)})
+    records=[]
+    for item in batch.transactions:
+        stamp=item.occurred_at if item.occurred_at.tzinfo else item.occurred_at.replace(tzinfo=timezone.utc)
+        records.append(Transaction(id=f"tx_{uuid.uuid4().hex[:16]}",merchant_id=item.merchant_id,amount=item.amount,status=item.status,channel=item.channel,
+          customer_token=item.customer_token,device_token=item.device_token,settlement_token=item.settlement_token,occurred_at=stamp,synthetic=item.synthetic))
+    db.add_all(records);db.flush();rebuild_graph(db);db.info.pop("trace_portfolio_features",None);db.info.pop("trace_category_features",None);db.info.pop("trace_isolation_model",None)
+    db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="transactions.ingested",resource_type="merchant_batch",resource_id=",".join(sorted(merchant_ids)),reason=f"Accepted {len(records)} transaction records."))
+    db.commit()
+    return {"accepted":len(records),"merchant_count":len(merchant_ids),"data_mode":"SYNTHETIC" if all(x.synthetic for x in records) else "MIXED"}
+
+@app.get("/api/risk-config")
+def risk_config():
+    from .analytics import WEIGHTS
+    return {"weights":WEIGHTS,"normalization":"Available component weights are renormalized when required dimensions are missing.","score_semantics":"0–100 review-priority index; not a probability."}
 
 @app.get("/api/merchants")
 def merchants(db:Session=Depends(get_db),q:str|None=None,category:str|None=None):
