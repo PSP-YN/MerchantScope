@@ -16,6 +16,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r backend/requirements.txt
+      - run: cd backend && DATABASE_URL=sqlite:///./trace_migration_ci.db alembic upgrade head
       - run: cd backend && pytest -q
   frontend:
     runs-on: ubuntu-latest
