@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json, os, uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -13,7 +14,27 @@ from .generator import seed_demo, run_scenario, rebuild_graph, SCENARIOS
 from .schemas import CaseUpdate, VerificationRequest, InterventionRequest, InterventionApproval, ScenarioRequest, ContextReview, MerchantCreate, TransactionBatch, MerchantEventCreate
 from .security import actor_context, require_role
 
-app=FastAPI(title="TRACE — Transaction Reality & Activity Consistency Engine",version="1.0.0",description="Explainable merchant-risk intelligence using synthetic demonstration data. Scores prioritize review and are not fraud probabilities.")
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    env=os.getenv("APP_ENV","demo").lower()
+    if env=="production":
+        required=["TRACE_ANALYST_TOKEN","TRACE_INVESTIGATOR_TOKEN","TRACE_ADMIN_TOKEN","TRACE_REVIEWER_TOKEN"]
+        missing=[key for key in required if not os.getenv(key)]
+        if missing:raise RuntimeError("Missing production security configuration: "+", ".join(missing))
+        token_values=[os.getenv(key,"") for key in required]
+        weak=[key for key in required if len(os.getenv(key,""))<32]
+        if weak:raise RuntimeError("Production bearer tokens must be at least 32 characters: "+", ".join(weak))
+        if len(set(token_values))!=len(token_values):raise RuntimeError("Each production role must have a distinct bearer token.")
+        if os.getenv("DATABASE_URL","").startswith("sqlite"):raise RuntimeError("Production requires PostgreSQL; configure DATABASE_URL.")
+    else:
+        Base.metadata.create_all(bind=engine)
+        from .db import SessionLocal
+        db=SessionLocal()
+        try:seed_demo(db)
+        finally:db.close()
+    yield
+
+app=FastAPI(title="TRACE — Transaction Reality & Activity Consistency Engine",version="1.0.0",description="Explainable merchant-risk intelligence. Synthetic demo by default; scores prioritize review and are not fraud probabilities."),lifespan=lifespan)
 origins=[x.strip() for x in os.getenv("CORS_ORIGINS","http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=False,allow_methods=["GET","POST","PATCH","OPTIONS"],allow_headers=["Authorization","Content-Type","X-Actor","X-Role"])
 @app.middleware("http")
@@ -25,25 +46,6 @@ async def production_auth_gate(request:Request,call_next):
         if not token or token not in valid:
             return JSONResponse(status_code=401,content={"detail":"Authentication required"})
     return await call_next(request)
-@app.on_event("startup")
-def startup():
-    env=os.getenv("APP_ENV","demo").lower()
-    if env=="production":
-        required=["TRACE_ANALYST_TOKEN","TRACE_INVESTIGATOR_TOKEN","TRACE_ADMIN_TOKEN","TRACE_REVIEWER_TOKEN"]
-        missing=[key for key in required if not os.getenv(key)]
-        if missing:raise RuntimeError("Missing production security configuration: "+", ".join(missing))
-        token_values=[os.getenv(key,"") for key in required]
-        weak=[key for key in required if len(os.getenv(key,""))<32]
-        if weak:raise RuntimeError("Production bearer tokens must be at least 32 characters: "+", ".join(weak))
-        if len(set(token_values))!=len(token_values):raise RuntimeError("Each production role must have a distinct bearer token.")
-        if os.getenv("DATABASE_URL","").startswith("sqlite"):raise RuntimeError("Production requires PostgreSQL; configure DATABASE_URL.")
-        return
-    Base.metadata.create_all(bind=engine)
-    from .db import SessionLocal
-    db=SessionLocal()
-    try: seed_demo(db)
-    finally: db.close()
-
 def _merchant(db,mid):
     m=db.get(Merchant,mid)
     if not m: raise HTTPException(404,"Merchant not found")
