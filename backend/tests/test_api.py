@@ -48,6 +48,9 @@ def test_investigation_verification_and_audit(client):
     assert any(x["resource_id"]==cid for x in client.get("/api/audit").json())
 
 def test_graph_and_evaluation(client):
+    context=client.get("/api/merchants/m-0021").json()["events"][0]
+    review=client.patch(f"/api/merchant-events/{context['id']}/verification",json={"verification_status":"partially_verified","review_reason":"One supporting invoice was checked by the investigator"},headers={"X-Role":"investigator"})
+    assert review.status_code==200 and review.json()["verification_status"]=="partially_verified"
     graph=client.get("/api/relationships?merchant_id=m-0051").json()
     assert graph["nodes"] and graph["edges"]
     evaluation=client.get("/api/evaluation").json()
