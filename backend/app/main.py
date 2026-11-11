@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from .db import Base, engine, get_db
-from .models import Merchant, Transaction, MerchantEvent, RiskAssessment, RiskSignal, Investigation, Intervention, AuditLog, EntityNode, EntityEdge, InvestigationNote
+from .models import Merchant, MerchantProfile, Transaction, MerchantEvent, RiskAssessment, RiskSignal, Investigation, Intervention, AuditLog, EntityNode, EntityEdge, InvestigationNote
 from .analytics import evaluate_merchant, merchant_features
 from .generator import seed_demo, run_scenario, rebuild_graph, SCENARIOS
 from .schemas import CaseUpdate, VerificationRequest, InterventionRequest, InterventionApproval, ScenarioRequest, ContextReview, MerchantCreate, TransactionBatch, MerchantEventCreate
