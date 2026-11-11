@@ -64,7 +64,7 @@ def _case_dict(db,c):
 
 @app.get("/health")
 def health(db:Session=Depends(get_db)):
-    return {"status":"ok","service":"trace-api","data_mode":"synthetic","database":"connected","merchant_count":db.scalar(select(func.count()).select_from(Merchant))}
+    return {"status":"ok","service":"trace-api","data_mode":"synthetic" if os.getenv("APP_ENV","demo").lower()!="production" else "ingested","database":"connected","merchant_count":db.scalar(select(func.count()).select_from(Merchant))}
 
 @app.get("/api/dashboard")
 def dashboard(db:Session=Depends(get_db)):
@@ -72,7 +72,7 @@ def dashboard(db:Session=Depends(get_db)):
     for m in merchants:
         r=evaluate_merchant(db,m,persist=False);f=r["features"]
         items.append({"id":m.id,"name":m.name,"category":m.category,"status":m.status,"risk_score":r["risk_score"],"risk_level":r["severity"],"confidence":r["confidence"],"signals":r["signals"],"explanation":r["explanation"],"features":f})
-    total_tx=db.scalar(select(func.count()).select_from(Transaction)) or 0
+    total_tx=db.scalar(select(func.count()).select_from(Transaction)) or 0\n    synthetic_tx=db.scalar(select(func.count()).select_from(Transaction).where(Transaction.synthetic.is_(True))) or 0\n    real_tx=total_tx-synthetic_tx\n    data_mode="SYNTHETIC DEMO DATA" if real_tx==0 else "MIXED INGESTED DATA" if synthetic_tx else "INGESTED TRANSACTION DATA"
     high=sum(x["risk_level"]=="high" for x in items);med=sum(x["risk_level"]=="medium" for x in items)
     open_cases=db.scalar(select(func.count()).select_from(Investigation).where(Investigation.status.in_(["open","investigating","escalated"]))) or 0
     verification=db.scalar(select(func.count()).select_from(Intervention).where(Intervention.action=="verification_request")) or 0
@@ -84,7 +84,7 @@ def dashboard(db:Session=Depends(get_db)):
         trend_map[day]["assessments"]+=1;trend_map[day][item.severity]+=1
     recent=db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(8)).all()
     recent_activity=[{"actor":x.actor,"action":x.action,"resource_type":x.resource_type,"resource_id":x.resource_id,"reason":x.reason,"created_at":x.created_at.isoformat()} for x in recent]
-    return {"data_mode":"SYNTHETIC DEMO DATA","generated_at":datetime.now(timezone.utc).isoformat(),"metrics":{"merchants_monitored":len(items),"transactions_monitored":total_tx,"high_risk_merchants":high,"open_investigations":open_cases,"verification_requests":verification,"legitimate_anomalies":sum(any(sig["key"]=="context" for sig in x["signals"]) and x["risk_level"]=="low" for x in items),"review_queue":high+med},"merchants":items,"scenarios":SCENARIOS,"risk_trend":sorted(trend_map.values(),key=lambda x:x["date"]),"recent_activity":recent_activity}
+    return {"data_mode":data_mode,"generated_at":datetime.now(timezone.utc).isoformat(),"metrics":{"merchants_monitored":len(items),"transactions_monitored":total_tx,"high_risk_merchants":high,"open_investigations":open_cases,"verification_requests":verification,"legitimate_anomalies":sum(any(sig["key"]=="context" for sig in x["signals"]) and x["risk_level"]=="low" for x in items),"review_queue":high+med},"merchants":items,"scenarios":SCENARIOS,"risk_trend":sorted(trend_map.values(),key=lambda x:x["date"]),"recent_activity":recent_activity}
 
 
 @app.post("/api/merchants")
@@ -192,6 +192,7 @@ def relationships(merchant_id:str|None=None,db:Session=Depends(get_db)):
 @app.post("/api/scenarios/run")
 def simulate(req:ScenarioRequest,db:Session=Depends(get_db),actor:dict=Depends(actor_context)):
     require_role(actor,{"analyst","investigator","admin"})
+    if os.getenv("APP_ENV","demo").lower()=="production":raise HTTPException(403,"Synthetic scenario execution is disabled in production.")
     try:result=run_scenario(db,req.merchant_id,req.scenario)
     except LookupError as e:raise HTTPException(404,str(e))
     except ValueError as e:raise HTTPException(422,str(e))
@@ -273,6 +274,7 @@ def audit(limit:int=Query(200,ge=1,le=1000),db:Session=Depends(get_db)):
 
 @app.get("/api/evaluation")
 def evaluation(db:Session=Depends(get_db)):
+    if os.getenv("APP_ENV","demo").lower()=="production":raise HTTPException(403,"Synthetic benchmark evaluation is disabled in production.")
     from .evaluation import evaluate_models
     return evaluate_models(db)
 
