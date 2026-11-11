@@ -40,9 +40,9 @@ def rebuild_graph(db:Session):
         for token,merchant_count in shared:
             node_id=f"{kind}:{str(token).split(':',1)[-1]}"
             db.add(EntityNode(id=node_id,entity_type=kind,label=f"Shared {kind} fingerprint · {str(token)[-12:]}",synthetic=True));db.flush()
-            rows=db.execute(select(Transaction.merchant_id,func.count(Transaction.id)).where(attr==token).group_by(Transaction.merchant_id)).all()
-            for mid,count in rows:
-                db.add(EntityEdge(source_id=mid,target_id=node_id,relation=f"shared_{kind}",evidence_count=int(count)))
+            rows=db.execute(select(Transaction.merchant_id,func.count(Transaction.id),func.min(Transaction.occurred_at),func.max(Transaction.occurred_at)).where(attr==token).group_by(Transaction.merchant_id)).all()
+            for mid,count,first_seen,last_seen in rows:
+                db.add(EntityEdge(source_id=mid,target_id=node_id,relation=f"shared_{kind}",evidence_count=int(count),first_seen=first_seen,last_seen=last_seen))
     db.flush()
 
 def seed_demo(db:Session,force:bool=False):
