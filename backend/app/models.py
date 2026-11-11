@@ -117,6 +117,14 @@ class Intervention(Base):
     approved_by:Mapped[str]=mapped_column(String(120),default="")
     approval_status:Mapped[str]=mapped_column(String(24),default="pending")
     created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow)
+class InvestigationNote(Base):
+    __tablename__="investigation_notes"
+    id:Mapped[int]=mapped_column(Integer,primary_key=True)
+    investigation_id:Mapped[str]=mapped_column(ForeignKey("investigations.id",ondelete="CASCADE"),index=True)
+    actor:Mapped[str]=mapped_column(String(120))
+    note:Mapped[str]=mapped_column(Text)
+    created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow)
+
 class AuditLog(Base):
     __tablename__="audit_logs"
     id:Mapped[int]=mapped_column(Integer,primary_key=True)
