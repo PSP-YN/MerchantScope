@@ -174,7 +174,12 @@ def simulate(req:ScenarioRequest,db:Session=Depends(get_db),actor:dict=Depends(a
     except ValueError as e:raise HTTPException(422,str(e))
     db.info.pop("trace_portfolio_features",None);db.info.pop("trace_category_features",None)
     db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="scenario.executed",resource_type="merchant",resource_id=req.merchant_id,reason=f"Executed synthetic scenario: {req.scenario}"))
-    merchant=_merchant(db,req.merchant_id);assessment=evaluate_merchant(db,merchant,persist=True);db.commit()
+    merchant=_merchant(db,req.merchant_id);assessment=evaluate_merchant(db,merchant,persist=True)
+    open_cases=db.scalars(select(Investigation).where(Investigation.merchant_id==req.merchant_id,Investigation.status.in_(["open","investigating","escalated"]))).all()
+    for case in open_cases:
+        case.assessment_id=assessment["assessment_id"];case.updated_at=datetime.now(timezone.utc)
+        db.add(AuditLog(actor=actor["actor"],role=actor["role"],action="investigation.assessment_refreshed",resource_type="investigation",resource_id=case.id,reason=f"Scenario {req.scenario} produced a refreshed assessment."))
+    db.commit()
     result["assessment"]=assessment
     return result
 
