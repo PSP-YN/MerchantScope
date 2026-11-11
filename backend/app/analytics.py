@@ -59,8 +59,17 @@ def evaluate_merchant(db:Session,merchant:Merchant,persist:bool=True):
     if hits:signals.append({"key":"category","label":"Declared activity description requires review","points":10,"detail":"Description contains terms outside the stated category; human verification required."})
     gs,degree,entities,G=graph_metrics(db,merchant.id);c["graph"]=gs
     if gs:signals.append({"key":"graph","label":"Shared entity relationships","points":min(25,degree*5),"detail":f"{degree} shared pseudonymous entity relationships require contextual review."})
-    events=db.scalars(select(MerchantEvent).where(MerchantEvent.merchant_id==merchant.id)).all();unverified=[e for e in events if e.verification_status!="verified"]
-    if unverified:c["context"]=min(100,20*len(unverified));signals.append({"key":"context","label":"Business-change context is unverified","points":5,"detail":f"{len(unverified)} declared context event(s) are not independently verified."})
+    events=db.scalars(select(MerchantEvent).where(MerchantEvent.merchant_id==merchant.id)).all()
+    context_points=0
+    for event in events:
+        status=event.verification_status
+        if status=="unverified":
+            context_points+=20;signals.append({"key":"context","label":"Business-change context is unresolved","points":5,"detail":f"{event.event_type}: declared context has not been independently verified."})
+        elif status=="partially_verified":
+            context_points+=10;signals.append({"key":"context_partial","label":"Business-change context is partially verified","points":2,"detail":f"{event.event_type}: some supporting evidence is recorded; remaining claims need review."})
+        elif status=="rejected":
+            context_points+=30;signals.append({"key":"context_rejected","label":"Declared business context was not substantiated","points":15,"detail":f"{event.event_type}: reviewer rejected the submitted explanation."})
+    c["context"]=min(100,context_points)
     portfolio=db.info.get("trace_portfolio_features")
     category_features=db.info.get("trace_category_features")
     if portfolio is None or category_features is None:
