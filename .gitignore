@@ -15,3 +15,5 @@ frontend/.next/
 backend/trace_demo.db
 *.sqlite
 *.sqlite3
+playwright-report/
+test-results/
