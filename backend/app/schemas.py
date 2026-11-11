@@ -59,3 +59,8 @@ class TransactionIngest(BaseModel):
 
 class TransactionBatch(BaseModel):
     transactions: list[TransactionIngest] = Field(min_length=1, max_length=1000)
+
+class MerchantEventCreate(BaseModel):
+    event_type: str = Field(pattern="^(festival_promotion|online_expansion|new_delivery_channel|new_product_category|changed_operating_hours|declared_business_change)$")
+    description: str = Field(min_length=12, max_length=2000)
+    effective_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
