@@ -1,7 +1,7 @@
 from __future__ import annotations
 import random,uuid,math
 from datetime import datetime,timedelta,timezone
-from sqlalchemy import delete
+from sqlalchemy import delete,select,func
 from sqlalchemy.orm import Session
 from .models import Merchant,MerchantProfile,Transaction,MerchantEvent,EntityNode,EntityEdge,RiskSignal,RiskAssessment,Investigation,InvestigationNote,Intervention,AuditLog,BehaviouralFeature
 
@@ -26,11 +26,25 @@ def _make_tx(mid,idx,cat,scenario,rng,now,days=90):
             if rng.random()<.018:status="failed"
             shared=scenario in {"shared_device","mixed_signals"} and recent and rng.random()<.85
             device="device:shared-cluster-01" if shared else f"device:{idx:03d}:{rng.randrange(1,18):02d}"
-            customer=f"customer:{idx:03d}:{rng.randrange(1,160):03d}";settlement=f"settlement:{idx:03d}"
+            customer="customer:shared-cluster-01" if shared and rng.random()<.25 else f"customer:{idx:03d}:{rng.randrange(1,160):03d}";settlement="settlement:shared-cluster-01" if shared and rng.random()<.35 else f"settlement:{idx:03d}"
             channel="online" if recent and scenario=="expansion" and rng.random()<.72 else rng.choice(["upi","card","wallet"])
             stamp=date.replace(hour=hour,minute=rng.randrange(60),second=rng.randrange(60),tzinfo=timezone.utc)
             rows.append(Transaction(id=_id("tx"),merchant_id=mid,amount=round(amount,2),status=status,channel=channel,customer_token=customer,device_token=device,settlement_token=settlement,occurred_at=stamp,synthetic=True))
     return rows
+def rebuild_graph(db:Session):
+    db.execute(delete(EntityEdge));db.execute(delete(EntityNode))
+    merchants=db.scalars(select(Merchant)).all()
+    db.add_all([EntityNode(id=m.id,entity_type="merchant",label=m.name,synthetic=True) for m in merchants]);db.flush()
+    for kind,attr in [("device",Transaction.device_token),("customer",Transaction.customer_token),("settlement",Transaction.settlement_token)]:
+        shared=db.execute(select(attr,func.count(func.distinct(Transaction.merchant_id))).group_by(attr).having(func.count(func.distinct(Transaction.merchant_id))>1)).all()
+        for token,merchant_count in shared:
+            node_id=f"{kind}:{str(token).split(':',1)[-1]}"
+            db.add(EntityNode(id=node_id,entity_type=kind,label=f"Shared {kind} fingerprint · {str(token)[-12:]}",synthetic=True));db.flush()
+            rows=db.execute(select(Transaction.merchant_id,func.count(Transaction.id)).where(attr==token).group_by(Transaction.merchant_id)).all()
+            for mid,count in rows:
+                db.add(EntityEdge(source_id=mid,target_id=node_id,relation=f"shared_{kind}",evidence_count=int(count)))
+    db.flush()
+
 def seed_demo(db:Session,force:bool=False):
     existing=db.query(Merchant).count()
     if existing and not force:return {"seeded":False,"merchants":existing,"transactions":db.query(Transaction).count()}
@@ -49,10 +63,7 @@ def seed_demo(db:Session,force:bool=False):
         if scenario in {"festival","expansion","mixed_signals"}:
             kind="festival_promotion" if scenario!="expansion" else "online_expansion"
             db.add(MerchantEvent(id=_id("evt"),merchant_id=m.id,event_type=kind,description=SCENARIOS[scenario]["description"],verification_status="unverified",effective_at=now-timedelta(days=12)))
-    db.add_all(txs);db.flush()
-    db.add_all([EntityNode(id=m.id,entity_type="merchant",label=m.name,synthetic=True) for m in merchants])
-    node=EntityNode(id="device:shared-cluster-01",entity_type="device",label="Shared device fingerprint · synthetic",synthetic=True);db.add(node);db.flush()
-    for i in range(50,60):db.add(EntityEdge(source_id=f"m-{i+1:04d}",target_id=node.id,relation="shared_device",evidence_count=8))
+    db.add_all(txs);db.flush();rebuild_graph(db)
     from .analytics import merchant_features
     for merchant in merchants:merchant_features(db,merchant)
     db.commit()
@@ -63,10 +74,8 @@ def run_scenario(db:Session,merchant_id:str,scenario:str):
     if not merchant:raise LookupError("Merchant not found")
     now=datetime.now(timezone.utc);idx=int(merchant_id.split("-")[-1]);db.execute(delete(Transaction).where(Transaction.merchant_id==merchant_id))
     rows=_make_tx(merchant.id,idx,merchant.category,scenario,random.Random(1000+idx+sum(map(ord,scenario))),now);db.add_all(rows)
-    db.execute(delete(MerchantEvent).where(MerchantEvent.merchant_id==merchant_id));db.execute(delete(EntityEdge).where(EntityEdge.source_id==merchant_id));merchant.scenario_label=scenario
+    db.execute(delete(MerchantEvent).where(MerchantEvent.merchant_id==merchant_id));merchant.scenario_label=scenario
     if scenario in {"festival","expansion","mixed_signals"}:
         db.add(MerchantEvent(id=_id("evt"),merchant_id=merchant.id,event_type="festival_promotion" if scenario!="expansion" else "online_expansion",description=SCENARIOS[scenario]["description"],verification_status="unverified",effective_at=now-timedelta(days=10)))
-    db.flush()
-    if scenario in {"shared_device","mixed_signals"} and db.get(EntityNode,"device:shared-cluster-01"):
-        db.add(EntityEdge(source_id=merchant_id,target_id="device:shared-cluster-01",relation="shared_device",evidence_count=sum(1 for t in rows if t.device_token=="device:shared-cluster-01")))\n    db.info.pop("trace_portfolio_features",None);db.info.pop("trace_category_features",None);db.commit()
+    db.flush();rebuild_graph(db)\n    db.info.pop("trace_portfolio_features",None);db.info.pop("trace_category_features",None);db.commit()
     return {"merchant_id":merchant_id,"scenario":scenario,"scenario_label":SCENARIOS[scenario]["label"],"transactions_replaced":len(rows),"data_mode":"SYNTHETIC"}
