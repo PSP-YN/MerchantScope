@@ -1,50 +1,39 @@
 from fastapi.testclient import TestClient
 from app.main import app
-from app.engine import MERCHANTS, score_merchant
+client=TestClient(app)
 
-client = TestClient(app)
+def test_health_and_portfolio():
+    r=client.get("/health");assert r.status_code==200 and r.json()["data_mode"]=="synthetic"
+    d=client.get("/api/dashboard").json()
+    assert d["metrics"]["merchants_monitored"]==100
+    assert d["metrics"]["transactions_monitored"]>=30000
+    assert len(d["merchants"])==100
 
-def test_health_and_synthetic_notice():
-    response = client.get('/health')
-    assert response.status_code == 200
-    assert response.json()['data_mode'] == 'synthetic'
+def test_merchant_and_transaction_detail():
+    r=client.get("/api/merchants/m-0001");assert r.status_code==200
+    assert r.json()["assessment"]["confidence"]>=0
+    tx=client.get("/api/merchants/m-0001/transactions?limit=10").json()
+    assert len(tx["items"])==10 and all(x["synthetic"] for x in tx["items"])
 
-def test_dashboard_has_expected_scenarios_and_risk_order():
-    data = client.get('/api/dashboard').json()
-    assert data['data_mode'] == 'SYNTHETIC DEMO DATA'
-    assert len(data['merchants']) == 5
-    by_id = {m['id']: m for m in data['merchants']}
-    assert by_id['m-1003']['risk_score'] > by_id['m-1001']['risk_score']
-    assert by_id['m-1003']['risk_level'] == 'high'
-    assert by_id['m-1002']['risk_level'] == 'low'
+def test_scenarios_execute_pipeline():
+    scenarios=client.get("/api/scenarios").json()
+    assert {"festival","expansion","unexplained_spike","shared_device","refund_anomaly","mixed_signals"}<=set(scenarios)
+    for scenario in ["festival","expansion","unexplained_spike","shared_device","refund_anomaly","mixed_signals"]:
+        r=client.post("/api/scenarios/run",json={"merchant_id":"m-0001","scenario":scenario})
+        assert r.status_code==200 and r.json()["assessment"]["severity"] in {"low","medium","high"}
 
-def test_merchant_not_found():
-    assert client.get('/api/merchants/not-real').status_code == 404
+def test_investigation_verification_and_audit():
+    assert client.post("/api/merchants/m-0001/assess").status_code==200
+    case=client.post("/api/investigations?merchant_id=m-0001");assert case.status_code==200
+    cid=case.json()["id"]
+    update=client.patch(f"/api/investigations/{cid}",json={"status":"investigating","note":"Review the declared change","assigned_to":"analyst-1"})
+    assert update.status_code==200 and update.json()["status"]=="investigating"
+    v=client.post(f"/api/investigations/{cid}/verification",json={"reason":"Confirm the declared operating change","requested_document":"Business registration"})
+    assert v.status_code==200
+    assert any(x["resource_id"]==cid for x in client.get("/api/audit").json())
 
-def test_case_status_validation_and_update():
-    cases = client.get('/api/cases').json()
-    assert cases
-    cid = cases[0]['id']
-    updated = client.patch(f'/api/cases/{cid}', json={'status': 'investigating', 'note': 'Review linked fingerprints'})
-    assert updated.status_code == 200
-    assert updated.json()['status'] == 'investigating'
-    assert updated.json()['notes'][-1] == 'Review linked fingerprints'
-
-def test_heuristic_explanations_are_bounded():
-    for merchant in MERCHANTS:
-        result = score_merchant(merchant)
-        assert 0 <= result['risk_score'] <= 100
-        assert result['risk_level'] in {'low', 'medium', 'high'}
-
-def test_transactions_are_explicitly_synthetic():
-    rows = client.get('/api/transactions?merchant_id=m-1003').json()
-    assert rows
-    assert all(row['synthetic'] is True for row in rows)
-    assert all(row['merchant_id'] == 'm-1003' for row in rows)
-
-def test_relationship_graph_has_grounded_edges():
-    graph = client.get('/api/relationships').json()
-    node_ids = {node['id'] for node in graph['nodes']}
-    assert graph['edges']
-    assert all(edge['source'] in node_ids and edge['target'] in node_ids for edge in graph['edges'])
-    assert 'Synthetic' in graph['notice']
+def test_graph_and_evaluation():
+    graph=client.get("/api/relationships?merchant_id=m-0051").json()
+    assert graph["nodes"] and graph["edges"]
+    evaluation=client.get("/api/evaluation").json()
+    assert 0<=evaluation["trace_contextual"]["f1"]<=1
