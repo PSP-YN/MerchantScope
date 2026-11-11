@@ -9,3 +9,9 @@ dist/
 .coverage
 
 *.tsbuildinfo
+.next/
+.env.local
+frontend/.next/
+backend/trace_demo.db
+*.sqlite
+*.sqlite3
