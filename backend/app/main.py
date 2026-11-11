@@ -55,7 +55,15 @@ def dashboard(db:Session=Depends(get_db)):
     high=sum(x["risk_level"]=="high" for x in items);med=sum(x["risk_level"]=="medium" for x in items)
     open_cases=db.scalar(select(func.count()).select_from(Investigation).where(Investigation.status.in_(["open","investigating","escalated"]))) or 0
     verification=db.scalar(select(func.count()).select_from(Intervention).where(Intervention.action=="verification_request")) or 0
-    return {"data_mode":"SYNTHETIC DEMO DATA","generated_at":datetime.now(timezone.utc).isoformat(),"metrics":{"merchants_monitored":len(items),"transactions_monitored":total_tx,"high_risk_merchants":high,"open_investigations":open_cases,"verification_requests":verification,"legitimate_anomalies":sum(any(s["key"]=="context" for s in x["signals"]) and x["risk_level"]=="low" for x in items)},"review_queue":high+med},"merchants":items,"scenarios":SCENARIOS}
+    assessments=db.scalars(select(RiskAssessment).order_by(RiskAssessment.created_at.desc()).limit(100)).all()
+    trend_map={}
+    for item in assessments:
+        day=item.created_at.date().isoformat()
+        trend_map.setdefault(day,{"date":day,"assessments":0,"high":0,"medium":0,"low":0})
+        trend_map[day]["assessments"]+=1;trend_map[day][item.severity]+=1
+    recent=db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(8)).all()
+    recent_activity=[{"actor":x.actor,"action":x.action,"resource_type":x.resource_type,"resource_id":x.resource_id,"reason":x.reason,"created_at":x.created_at.isoformat()} for x in recent]
+    return {"data_mode":"SYNTHETIC DEMO DATA","generated_at":datetime.now(timezone.utc).isoformat(),"metrics":{"merchants_monitored":len(items),"transactions_monitored":total_tx,"high_risk_merchants":high,"open_investigations":open_cases,"verification_requests":verification,"legitimate_anomalies":sum(any(sig["key"]=="context" for sig in x["signals"]) and x["risk_level"]=="low" for x in items),"review_queue":high+med},"merchants":items,"scenarios":SCENARIOS,"risk_trend":sorted(trend_map.values(),key=lambda x:x["date"]),"recent_activity":recent_activity}
 
 @app.get("/api/merchants")
 def merchants(db:Session=Depends(get_db),q:str|None=None,category:str|None=None):
