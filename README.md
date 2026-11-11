@@ -29,7 +29,7 @@ TRACE helps payment risk teams distinguish legitimate merchant evolution from su
 
 ## Quick start
 
-Requirements: Python 3.11 or 3.12 (3.12 recommended), Node.js 20+, npm.
+Requirements: Python 3.11, 3.12 or 3.13 (3.12 recommended), Node.js 20+, npm.
 
 For a single-command local startup, run `bash scripts/dev.sh` from the repository root. It creates the backend virtual environment, installs dependencies, copies local example environment files when absent, and starts the API and frontend. Stop both services with Ctrl+C.
 
