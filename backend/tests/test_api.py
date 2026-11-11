@@ -26,6 +26,8 @@ def test_scenarios_execute_pipeline(client):
     for scenario in ["festival","expansion","unexplained_spike","shared_device","refund_anomaly","mixed_signals"]:
         r=client.post("/api/scenarios/run",json={"merchant_id":"m-0001","scenario":scenario})
         assert r.status_code==200 and r.json()["assessment"]["severity"] in {"low","medium","high"}
+        if scenario in {"festival","expansion"}: assert r.json()["assessment"]["severity"]=="low"
+        if scenario in {"unexplained_spike","shared_device","refund_anomaly","mixed_signals"}: assert r.json()["assessment"]["risk_score"]>=20
 
 def test_investigation_verification_and_audit(client):
     assert client.post("/api/merchants/m-0001/assess").status_code==200
