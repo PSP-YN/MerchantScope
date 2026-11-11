@@ -18,6 +18,12 @@ jobs:
       - run: pip install -r backend/requirements.txt
       - run: cd backend && DATABASE_URL=sqlite:///./trace_migration_ci.db alembic upgrade head
       - run: cd backend && pytest -q
+      - run: python evaluation/run.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trace-synthetic-evaluation
+          path: evaluation/reports/latest-benchmark.json
+          if-no-files-found: error
   frontend:
     runs-on: ubuntu-latest
     steps:
