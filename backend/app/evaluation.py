@@ -2,6 +2,7 @@ from sklearn.metrics import precision_score,recall_score,f1_score,confusion_matr
 from sqlalchemy import select,func
 from sqlalchemy.orm import Session
 import pandas as pd
+from datetime import timedelta
 from .models import Merchant,Transaction
 from .analytics import evaluate_merchant,_aware
 
@@ -14,7 +15,7 @@ def _scenario_delay(db:Session,merchant:Merchant,shared_devices:set[str]):
     rows=db.scalars(select(Transaction).where(Transaction.merchant_id==merchant.id).order_by(Transaction.occurred_at)).all()
     if len(rows)<40:return None
     frame=pd.DataFrame([{"amount":r.amount,"status":r.status,"device":r.device_token,"date":_aware(r.occurred_at).date(),"night":int(_aware(r.occurred_at).hour<7 or _aware(r.occurred_at).hour>=22)} for r in rows])
-    cutoff=max(frame.date)-pd.Timedelta(days=30)
+    cutoff=max(frame.date)-timedelta(days=30)
     base=frame[frame.date<cutoff];current=frame[frame.date>=cutoff]
     if base.empty or current.empty:return None
     baseline_count=float(base.groupby("date").size().mean());baseline_refund=float(base.status.eq("refunded").mean())
