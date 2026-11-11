@@ -105,7 +105,10 @@ def evaluate_merchant(db:Session,merchant:Merchant,persist:bool=True):
             db.info["trace_isolation_model"]=model
         anomaly=float(model.decision_function([[f[k] for k in ["daily_count","avg_ticket","refund_rate","failed_rate","night_share","customer_concentration"]]])[0])
         if anomaly<-.08:c["behaviour"]=max(c["behaviour"],min(100,abs(anomaly)*500))
-    available={k:v for k,v in c.items() if k not in {"behaviour","payment"} or f["sufficient_history"]}\n    if len(peers)<5 and not hits:available.pop("category",None)\n    if f["transaction_count"]==0:available.pop("graph",None)\n    denom=sum(WEIGHTS[k] for k in available)
+    available={k:v for k,v in c.items() if k not in {"behaviour","payment"} or f["sufficient_history"]}
+    if len(peers)<5 and not hits:available.pop("category",None)
+    if f["transaction_count"]==0:available.pop("graph",None)
+    denom=sum(WEIGHTS[k] for k in available)
     score=round(sum(WEIGHTS[k]*v for k,v in available.items())/denom,1) if denom else 0.
     confidence=round(100*((.45 if f["sufficient_history"] else .05)+(.20 if entities else 0)+(.15 if events else 0)+(.20 if len(portfolio)>=20 else 0)),1)
     severity="high" if score>=40 else "medium" if score>=20 else "low"
