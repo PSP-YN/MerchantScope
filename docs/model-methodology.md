@@ -6,7 +6,7 @@ Baseline window: first 60 days. Evaluation window: most recent 30 days. Features
 ## Detection
 - Rolling-window comparisons use merchant-specific baselines.
 - Rule signals expose observed current values and baselines.
-- Isolation Forest is fit on cross-merchant feature vectors with a fixed random seed; its decision function is an anomaly signal, not a fraud probability.
+- Isolation Forest is fit on cross-merchant historical baseline feature vectors (first 60 days) with a fixed random seed, then scores current-window features (latest 30 days). Its decision function is an anomaly signal, not a fraud probability.
 - NetworkX represents merchant-to-device/customer/settlement relationships. Shared identifiers are investigative leads, never proof.
 - Structured context events are marked unverified by default. Context does not erase independent graph or payment signals.
 
