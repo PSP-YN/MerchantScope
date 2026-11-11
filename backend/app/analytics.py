@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, uuid
+import json, uuid, os
 from datetime import datetime, timedelta, timezone
 import pandas as pd
 import networkx as nx
@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from .models import Merchant, Transaction, MerchantEvent, BehaviouralFeature, RiskAssessment, RiskSignal, AuditLog
 
-WEIGHTS={"behaviour":.25,"category":.25,"graph":.25,"payment":.15,"context":.10}
+_DEFAULT_WEIGHTS={"behaviour":.25,"category":.25,"graph":.25,"payment":.15,"context":.10}
+def _weight(key,default):
+    try:return max(0.0,float(os.getenv(f"TRACE_WEIGHT_{key.upper()}",str(default))))
+    except ValueError:return default
+WEIGHTS={key:_weight(key,value) for key,value in _DEFAULT_WEIGHTS.items()}
+if sum(WEIGHTS.values())<=0:WEIGHTS=_DEFAULT_WEIGHTS.copy()
 def _uid(p): return f"{p}_{uuid.uuid4().hex[:12]}"
 def _aware(dt): return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
